@@ -318,6 +318,7 @@ export const CreateProformaModal = ({
       valid_until: '',
       notes: '',
       terms_and_conditions: '',
+      display_as_percentage: false,
     });
     setItems([]);
     setSearchTerm('');

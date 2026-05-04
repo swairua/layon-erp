@@ -568,27 +568,128 @@ export const useConvertProformaToInvoice = () => {
 
   return useMutation({
     mutationFn: async ({ proformaId, companyId }: { proformaId: string; companyId: string }) => {
-      // This would implement the conversion logic
-      // For now, just mark the proforma as converted
-      const { data, error } = await supabase
+      // Get proforma data with items
+      let query = supabase
         .from('proforma_invoices')
-        .update({ status: 'converted' })
-        .eq('id', proformaId)
-        .eq('company_id', companyId)
+        .select(`
+          *,
+          proforma_items(*)
+        `)
+        .eq('id', proformaId);
+
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+
+      const { data: proforma, error: proformaError } = await query.single();
+
+      if (proformaError) throw proformaError;
+
+      // Generate invoice number
+      const { data: invoiceNumber } = await supabase.rpc('generate_invoice_number', {
+        company_uuid: proforma.company_id
+      });
+
+      // Determine creator
+      let createdBy: string | null = null;
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        createdBy = userData?.user?.id || null;
+      } catch {
+        createdBy = null;
+      }
+
+      // Create invoice from proforma, copying the display_as_percentage flag
+      const invoiceData = {
+        company_id: proforma.company_id,
+        customer_id: proforma.customer_id,
+        invoice_number: invoiceNumber,
+        invoice_date: new Date().toISOString().split('T')[0],
+        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        status: 'sent',
+        subtotal: proforma.subtotal,
+        tax_amount: proforma.tax_amount,
+        total_amount: proforma.total_amount,
+        currency: 'KES',
+        notes: proforma.notes,
+        terms_and_conditions: proforma.terms_and_conditions,
+        created_by: createdBy,
+        balance_due: proforma.total_amount,
+        paid_amount: 0,
+        display_as_percentage: proforma.display_as_percentage || false
+      };
+
+      const { data: invoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .insert([invoiceData])
         .select()
         .single();
 
-      if (error) {
-        console.error('Error converting proforma to invoice:', error);
-        throw error;
+      if (invoiceError) throw invoiceError;
+
+      // Create invoice items from proforma items
+      if (proforma.proforma_items && proforma.proforma_items.length > 0) {
+        const invoiceItems = proforma.proforma_items.map((item: any) => ({
+          invoice_id: invoice.id,
+          product_id: item.product_id,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          tax_percentage: item.tax_percentage,
+          tax_amount: item.tax_amount,
+          tax_inclusive: item.tax_inclusive,
+          line_total: item.line_total
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('invoice_items')
+          .insert(invoiceItems);
+
+        if (itemsError) throw itemsError;
+
+        // Create stock movements for products
+        const stockMovements = invoiceItems
+          .filter(item => item.product_id && item.quantity > 0)
+          .map(item => ({
+            company_id: invoice.company_id,
+            product_id: item.product_id,
+            movement_type: 'OUT' as const,
+            reference_type: 'INVOICE' as const,
+            reference_id: invoice.id,
+            quantity: -item.quantity,
+            cost_per_unit: item.unit_price,
+            notes: `Stock reduction for invoice ${invoice.invoice_number} (converted from proforma ${proforma.proforma_number})`
+          }));
+
+        if (stockMovements.length > 0) {
+          await supabase.from('stock_movements').insert(stockMovements);
+
+          // Update product stock quantities
+          const stockUpdatePromises = stockMovements.map(movement =>
+            supabase.rpc('update_product_stock', {
+              product_uuid: movement.product_id,
+              movement_type: movement.movement_type,
+              quantity: Math.abs(movement.quantity)
+            })
+          );
+
+          await Promise.allSettled(stockUpdatePromises);
+        }
       }
 
-      return data;
+      // Update proforma status to converted
+      await supabase
+        .from('proforma_invoices')
+        .update({ status: 'converted' })
+        .eq('id', proformaId)
+        .eq('company_id', companyId);
+
+      return invoice;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['proforma_invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['proforma_invoice', data.id] });
-      toast.success(`Proforma invoice ${data.proforma_number} converted to invoice!`);
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast.success(`Proforma invoice converted to invoice ${data.invoice_number}!`);
     },
     onError: (error) => {
       const errorMessage = serializeError(error);

@@ -269,7 +269,8 @@ export const useConvertQuotationToInvoice = () => {
         terms_and_conditions: quotation.terms_and_conditions,
         created_by: createdBy,
         balance_due: quotation.total_amount,
-        paid_amount: 0
+        paid_amount: 0,
+        display_as_percentage: quotation.display_as_percentage || false
       };
 
       const { data: invoice, error: invoiceError } = await supabase
