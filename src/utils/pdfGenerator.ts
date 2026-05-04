@@ -2571,9 +2571,16 @@ export const generatePDF = async (data: DocumentData) => {
       </html>
     `;
 
-    const filename = data.project_title
-      ? `${data.number}-${data.project_title}.pdf`
-      : `${data.number}.pdf`;
+    let filename: string;
+    if (data.type === 'receipt') {
+      filename = `RECEIPT - ${data.number}.pdf`;
+    } else if (data.type === 'invoice' && data.project_title) {
+      filename = `INVOICE - ${data.project_title}.pdf`;
+    } else if (data.project_title) {
+      filename = `${data.number}-${data.project_title}.pdf`;
+    } else {
+      filename = `${data.number}.pdf`;
+    }
     await convertHTMLToPDFAndDownload(htmlContentWithSections, filename);
   }
 
@@ -3599,9 +3606,16 @@ export const generatePDF = async (data: DocumentData) => {
     </html>
   `;
 
-  const fallbackFilename = data.project_title
-    ? `${data.number}-${data.project_title}.pdf`
-    : `${data.number}.pdf`;
+  let fallbackFilename: string;
+  if (data.type === 'receipt') {
+    fallbackFilename = `RECEIPT - ${data.number}.pdf`;
+  } else if (data.type === 'invoice' && data.project_title) {
+    fallbackFilename = `INVOICE - ${data.project_title}.pdf`;
+  } else if (data.project_title) {
+    fallbackFilename = `${data.number}-${data.project_title}.pdf`;
+  } else {
+    fallbackFilename = `${data.number}.pdf`;
+  }
   await convertHTMLToPDFAndDownload(htmlContent, fallbackFilename);
 };
 
