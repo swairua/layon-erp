@@ -17,14 +17,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Mail, User, Phone, Building, MapPin } from 'lucide-react';
+import { Loader2, Mail, User, Phone, Building, MapPin, Lock } from 'lucide-react';
 import { UserRole } from '@/contexts/AuthContext';
 import { CreateUserData } from '@/hooks/useUserManagement';
 
 interface CreateUserModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreateUser: (userData: CreateUserData) => Promise<{ success: boolean; error?: string }>;
+  onCreateUser: (userData: CreateUserData & { password: string }) => Promise<{ success: boolean; error?: string }>;
   loading?: boolean;
 }
 
@@ -34,31 +34,38 @@ export function CreateUserModal({
   onCreateUser,
   loading = false,
 }: CreateUserModalProps) {
-  const [formData, setFormData] = useState<CreateUserData>({
+  const [formData, setFormData] = useState<CreateUserData & { password: string }>({
     email: '',
     full_name: '',
     role: 'user',
     phone: '',
     department: '',
     position: '',
+    password: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
 
-    if (!formData.email.trim()) {
+    if (!formData.email || !formData.email.trim()) {
       errors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       errors.email = 'Please enter a valid email';
     }
 
-    if (!formData.full_name.trim()) {
+    if (!formData.full_name || !formData.full_name.trim()) {
       errors.full_name = 'Full name is required';
     }
 
     if (!formData.role) {
       errors.role = 'Role is required';
+    }
+
+    if (!formData.password || !formData.password.trim()) {
+      errors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters';
     }
 
     setFormErrors(errors);
@@ -69,13 +76,20 @@ export function CreateUserModal({
     e.preventDefault();
 
     if (!validateForm()) {
+      console.warn('Form validation failed');
       return;
     }
 
-    const result = await onCreateUser(formData);
-    
-    if (result.success) {
-      handleClose();
+    try {
+      const result = await onCreateUser(formData);
+
+      if (result.success) {
+        handleClose();
+      } else {
+        console.error('Failed to create user:', result.error);
+      }
+    } catch (error) {
+      console.error('Error creating user:', error);
     }
   };
 
@@ -88,14 +102,15 @@ export function CreateUserModal({
       phone: '',
       department: '',
       position: '',
+      password: '',
     });
     setFormErrors({});
   };
 
-  const handleInputChange = (field: keyof CreateUserData) => (
+  const handleInputChange = (field: string) => (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
-    setFormData(prev => ({ ...prev, [field]: e.target.value }));
+    setFormData(prev => ({ ...prev, [field]: e.target.value } as any));
     if (formErrors[field]) {
       setFormErrors(prev => ({ ...prev, [field]: '' }));
     }
@@ -232,6 +247,25 @@ export function CreateUserModal({
                 disabled={loading}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password">Password *</Label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter a secure password"
+                value={formData.password}
+                onChange={handleInputChange('password')}
+                className={`pl-10 ${formErrors.password ? 'border-destructive' : ''}`}
+                disabled={loading}
+              />
+            </div>
+            {formErrors.password && (
+              <p className="text-sm text-destructive">{formErrors.password}</p>
+            )}
           </div>
 
           <DialogFooter>

@@ -24,6 +24,7 @@ export interface CreateUserData {
   phone?: string;
   department?: string;
   position?: string;
+  password?: string;
 }
 
 export interface UpdateUserData {
@@ -130,22 +131,95 @@ const useUserManagement = () => {
     setLoading(true);
 
     try {
-      // Create profile for the new user
-      const { error } = await supabase
-        .from('profiles')
-        .insert({
+      if (userData.password) {
+        // Check if user already exists by email
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', userData.email)
+          .maybeSingle();
+
+        if (existingProfile) {
+          throw new Error('User with this email already exists');
+        }
+
+        // Create auth user first
+        const { data: authData, error: authError } = await supabase.auth.signUp({
           email: userData.email,
+          password: userData.password,
+          options: {
+            data: {
+              full_name: userData.full_name,
+            },
+          },
+        });
+
+        if (authError) {
+          // Handle duplicate email error from auth
+          const errorMsg = authError.message?.toLowerCase() || '';
+          if (errorMsg.includes('duplicate') || errorMsg.includes('already exists') || errorMsg.includes('user already registered')) {
+            throw new Error('User with this email already exists');
+          }
+          throw authError;
+        }
+
+        if (!authData.user) {
+          throw new Error('Failed to create auth user');
+        }
+
+        // Update the profile that was auto-created by the trigger
+        const profileData = {
           full_name: userData.full_name,
           role: userData.role,
           phone: userData.phone,
           department: userData.department,
           position: userData.position,
           company_id: currentUser.company_id,
-          status: 'active',
-        });
+          status: 'active' as const,
+        };
 
-      if (error) {
-        throw error;
+        console.log('Updating profile for user:', authData.user.id, 'with data:', profileData);
+
+        const { error: profileError, data: profileResult } = await supabase
+          .from('profiles')
+          .update(profileData)
+          .eq('id', authData.user.id)
+          .select();
+
+        console.log('Profile update result:', { profileResult, profileError });
+
+        if (profileError) {
+          // Clean up auth user if profile update fails
+          console.error('Profile update failed, cleaning up auth user:', profileError);
+          await supabase.auth.admin?.deleteUser(authData.user.id).catch((err) => {
+            console.error('Failed to clean up auth user:', err);
+          });
+          throw profileError;
+        }
+
+        if (!profileResult || profileResult.length === 0) {
+          // Clean up auth user if profile wasn't updated
+          await supabase.auth.admin?.deleteUser(authData.user.id).catch(() => {});
+          throw new Error('Failed to update user profile');
+        }
+      } else {
+        // Fallback: Create profile without auth (legacy behavior)
+        const { error } = await supabase
+          .from('profiles')
+          .insert({
+            email: userData.email,
+            full_name: userData.full_name,
+            role: userData.role,
+            phone: userData.phone,
+            department: userData.department,
+            position: userData.position,
+            company_id: currentUser.company_id,
+            status: 'active',
+          });
+
+        if (error) {
+          throw error;
+        }
       }
 
       toast.success('User created successfully');
