@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -25,10 +35,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Trash2, Calculator, Layers } from 'lucide-react';
 import { useCompanies, useCustomers, useUnits } from '@/hooks/useDatabase';
 import { CreateUnitModal } from '@/components/units/CreateUnitModal';
+import { BOQSaveIndicator } from '@/components/boq/BOQSaveIndicator';
 import { toast } from 'sonner';
 import { downloadBOQPDF, BoqDocument } from '@/utils/boqPdfGenerator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDebounce } from '@/hooks/useDebounce';
+import { saveEditingDraft, loadEditDraft, deleteEditDraft } from '@/services/boqAutoSaveService';
 
 // Safe UUID generator that works in all environments
 const generateSafeUUID = (): string => {
@@ -102,6 +115,12 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
   const [unitModalOpen, setUnitModalOpen] = useState(false);
   const [pendingUnitTarget, setPendingUnitTarget] = useState<{ sectionId: string; itemId: string } | null>(null);
   const [previewItem, setPreviewItem] = useState<{ sectionId: string; subsectionId: string; itemId: string } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingClose, setPendingClose] = useState(false);
+  const unsavedChangesRef = useRef(false);
 
   const [boqNumber, setBoqNumber] = useState('');
   const [boqDate, setBoqDate] = useState('');
@@ -118,63 +137,180 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
 
   const selectedClient = useMemo(() => customers.find(c => c.id === clientId), [customers, clientId]);
 
-  useEffect(() => {
-    if (open && boq && boq.data) {
-      const boqData = boq.data;
-      setBoqNumber(boq.number || '');
-      setBoqDate(boq.boq_date || '');
-      setDueDate(boq.due_date || '');
-      setProjectTitle(boqData.project_title || '');
-      setContractor(boqData.contractor || '');
-      setNotes(boqData.notes || '');
-      // Use ONLY top-level terms_and_conditions as source of truth (single source)
-      // Nested data should NOT be used for terms - top-level columns are authoritative
-      const termsToUse = boq.terms_and_conditions || '';
-      setTermsAndConditions(termsToUse);
-      // Use ONLY top-level showCalculatedValuesInTerms as source of truth
-      const showCalcValues = boq.showCalculatedValuesInTerms || false;
-      setShowCalculatedValuesInTerms(showCalcValues);
-      setCurrency(boqData.currency || 'KES');
+  // Autosave function
+  const performAutosave = useCallback(async () => {
+    if (!boq?.id || !profile?.id || !currentCompany?.id) return;
 
-      const clientIdFromBoq = customers.find(c => c.name === boq.client_name)?.id;
-      if (clientIdFromBoq) {
-        setClientId(clientIdFromBoq);
-      }
+    setIsSaving(true);
+    try {
+      const filledSections = getFilledItems();
 
-      if (boqData.sections && boqData.sections.length > 0) {
-        const loadedSections: BOQSectionRow[] = boqData.sections.map((section: any) => ({
-          id: `section-${generateSafeUUID()}`,
-          title: section.title || 'General',
-          subsections: (section.subsections || []).map((subsection: any) => ({
-            id: `subsection-${generateSafeUUID()}`,
-            name: subsection.name,
-            label: subsection.label,
-            items: (subsection.items || []).map((item: any) => ({
-              id: `item-${generateSafeUUID()}`,
-              description: item.description,
-              quantity: item.quantity || 1,
-              unit: item.unit_id || '',
-              rate: item.rate || 0,
-            })),
+      let filledSubtotal = 0;
+      filledSections.forEach(sec => {
+        sec.subsections.forEach(sub => {
+          sub.items.forEach(item => {
+            filledSubtotal += (item.quantity || 0) * (item.rate || 0);
+          });
+        });
+      });
+
+      const draftData = {
+        number: boqNumber,
+        boq_date: boqDate,
+        due_date: dueDate,
+        customer_id: clientId,
+        client_name: selectedClient?.name || '',
+        client_email: selectedClient?.email || null,
+        client_phone: selectedClient?.phone || null,
+        client_address: selectedClient?.address || null,
+        client_city: selectedClient?.city || null,
+        client_country: selectedClient?.country || null,
+        contractor: contractor || null,
+        project_title: projectTitle || null,
+        currency: currency,
+        subtotal: filledSubtotal,
+        tax_amount: 0,
+        total_amount: filledSubtotal,
+        data: {
+          sections: filledSections.map(s => ({
+            title: s.title,
+            subsections: s.subsections.map(sub => ({
+              name: sub.name,
+              label: sub.label,
+              items: sub.items.map(i => {
+                const unitObj = units.find((u: any) => u.id === i.unit);
+                return {
+                  description: i.description,
+                  quantity: i.quantity,
+                  unit_id: i.unit || null,
+                  unit_name: unitObj ? unitObj.name : i.unit || null,
+                  rate: i.rate,
+                };
+              })
+            }))
           })),
-        }));
-        setSections(loadedSections);
+          notes: notes,
+        },
+        terms_and_conditions: termsAndConditions || null,
+        show_calculated_values_in_terms: showCalculatedValuesInTerms,
+      };
+
+      const result = await saveEditingDraft(profile.id, currentCompany.id, boq.id, draftData);
+
+      if (result.success) {
+        setLastSavedTime(new Date().toISOString());
+        setHasUnsavedChanges(false);
+        unsavedChangesRef.current = false;
       } else {
-        setSections([defaultSection()]);
+        console.error('Autosave failed:', result.error);
       }
+    } catch (err) {
+      console.error('Error during autosave:', err);
+    } finally {
+      setIsSaving(false);
     }
-  }, [open, boq, customers]);
+  }, [boq?.id, profile?.id, currentCompany?.id, boqNumber, boqDate, dueDate, clientId, selectedClient, contractor, projectTitle, currency, units, notes, termsAndConditions, showCalculatedValuesInTerms]);
+
+  // Debounce autosave to 5 seconds
+  const debouncedAutosave = useDebounce(performAutosave, 5000);
+
+  // Mark as changed and trigger autosave
+  const triggerAutosave = useCallback(() => {
+    setHasUnsavedChanges(true);
+    unsavedChangesRef.current = true;
+    debouncedAutosave();
+  }, [debouncedAutosave]);
+
+  // Handle browser unload with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (unsavedChangesRef.current) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
+  useEffect(() => {
+    if (open && boq && boq.data && profile?.id && currentCompany?.id) {
+      // Check if there's an edit draft for this BOQ
+      const checkAndLoadDraft = async () => {
+        const editDraft = await loadEditDraft(profile.id, currentCompany.id, boq.id);
+
+        // Load from draft if it exists and is newer than published version
+        const dataToUse = editDraft && new Date(editDraft.updated_at) > new Date(boq.updated_at)
+          ? editDraft
+          : boq;
+
+        const boqData = dataToUse.data;
+        setBoqNumber(dataToUse.number || '');
+        setBoqDate(dataToUse.boq_date || '');
+        setDueDate(dataToUse.due_date || '');
+        setProjectTitle(boqData.project_title || '');
+        setContractor(boqData.contractor || '');
+        setNotes(boqData.notes || '');
+
+        const termsToUse = dataToUse.terms_and_conditions || '';
+        setTermsAndConditions(termsToUse);
+        const showCalcValues = dataToUse.show_calculated_values_in_terms || false;
+        setShowCalculatedValuesInTerms(showCalcValues);
+        setCurrency(boqData.currency || 'KES');
+
+        const clientIdFromBoq = customers.find(c => c.name === dataToUse.client_name)?.id;
+        if (clientIdFromBoq) {
+          setClientId(clientIdFromBoq);
+        }
+
+        if (boqData.sections && boqData.sections.length > 0) {
+          const loadedSections: BOQSectionRow[] = boqData.sections.map((section: any) => ({
+            id: `section-${generateSafeUUID()}`,
+            title: section.title || 'General',
+            subsections: (section.subsections || []).map((subsection: any) => ({
+              id: `subsection-${generateSafeUUID()}`,
+              name: subsection.name,
+              label: subsection.label,
+              items: (subsection.items || []).map((item: any) => ({
+                id: `item-${generateSafeUUID()}`,
+                description: item.description,
+                quantity: item.quantity || 1,
+                unit: item.unit_id || '',
+                rate: item.rate || 0,
+              })),
+            })),
+          }));
+          setSections(loadedSections);
+        } else {
+          setSections([defaultSection()]);
+        }
+
+        // Set last saved time if we loaded a draft
+        if (editDraft) {
+          setLastSavedTime(editDraft.last_autosaved_at);
+        }
+        setHasUnsavedChanges(false);
+        unsavedChangesRef.current = false;
+      };
+
+      checkAndLoadDraft();
+    }
+  }, [open, boq, customers, profile?.id, currentCompany?.id]);
 
   const addSection = () => {
     setSections(prev => [...prev, defaultSection()]);
+    triggerAutosave();
   };
 
   const removeSection = (sectionId: string) => {
     setSections(prev => prev.filter(s => s.id !== sectionId));
+    triggerAutosave();
   };
 
   const updateSectionTitle = (sectionId: string, title: string) => {
     setSections(prev => prev.map(s => s.id === sectionId ? { ...s, title } : s));
+    triggerAutosave();
   };
 
   const addItem = (sectionId: string, subsectionId: string) => {
@@ -182,6 +318,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
       ...s,
       subsections: s.subsections.map(sub => sub.id === subsectionId ? { ...sub, items: [...sub.items, defaultItem()] } : sub)
     } : s));
+    triggerAutosave();
   };
 
   const removeItem = (sectionId: string, subsectionId: string, itemId: string) => {
@@ -189,6 +326,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
       ...s,
       subsections: s.subsections.map(sub => sub.id === subsectionId ? { ...sub, items: sub.items.filter(i => i.id !== itemId) } : sub)
     } : s));
+    triggerAutosave();
   };
 
   const updateItem = (sectionId: string, subsectionId: string, itemId: string, field: keyof BOQItemRow, value: string | number) => {
@@ -205,6 +343,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
         })
       };
     }));
+    triggerAutosave();
   };
 
   const updateSubsectionLabel = (sectionId: string, subsectionId: string, label: string) => {
@@ -212,6 +351,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
       ...s,
       subsections: s.subsections.map(sub => sub.id === subsectionId ? { ...sub, label } : sub)
     } : s));
+    triggerAutosave();
   };
 
   const addSubsection = (sectionId: string) => {
@@ -223,6 +363,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
         subsections: [...s.subsections, defaultSubsection(nextLetter, `Subsection ${nextLetter}`)]
       };
     }));
+    triggerAutosave();
   };
 
   const removeSubsection = (sectionId: string, subsectionId: string) => {
@@ -233,6 +374,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
         subsections: s.subsections.filter(sub => sub.id !== subsectionId)
       };
     }));
+    triggerAutosave();
   };
 
   const formatCurrency = (amount: number) => {
@@ -379,6 +521,13 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
         return;
       }
 
+      // Delete the edit draft since we've successfully saved
+      if (profile?.id && currentCompany?.id) {
+        await deleteEditDraft(profile.id, currentCompany.id, boq.id);
+      }
+
+      setHasUnsavedChanges(false);
+      unsavedChangesRef.current = false;
       toast.success(`BOQ ${boqNumber} updated`);
       onOpenChange(false);
       onSuccess?.();
@@ -407,19 +556,19 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <Label>BOQ Number</Label>
-              <Input value={boqNumber} onChange={e => setBoqNumber(e.target.value)} />
+              <Input value={boqNumber} onChange={e => { setBoqNumber(e.target.value); triggerAutosave(); }} />
             </div>
             <div>
               <Label>Date</Label>
-              <Input type="date" value={boqDate} onChange={e => setBoqDate(e.target.value)} />
+              <Input type="date" value={boqDate} onChange={e => { setBoqDate(e.target.value); triggerAutosave(); }} />
             </div>
             <div>
               <Label>Due Date</Label>
-              <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+              <Input type="date" value={dueDate} onChange={e => { setDueDate(e.target.value); triggerAutosave(); }} />
             </div>
             <div>
               <Label>Currency</Label>
-              <Select value={currency} onValueChange={setCurrency}>
+              <Select value={currency} onValueChange={val => { setCurrency(val); triggerAutosave(); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
@@ -435,7 +584,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
 
           <div>
             <Label>Client</Label>
-            <Select value={clientId} onValueChange={setClientId}>
+            <Select value={clientId} onValueChange={val => { setClientId(val); triggerAutosave(); }}>
               <SelectTrigger>
                 <SelectValue placeholder="Select client" />
               </SelectTrigger>
@@ -450,11 +599,11 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Project Title</Label>
-              <Input value={projectTitle} onChange={e => setProjectTitle(e.target.value)} />
+              <Input value={projectTitle} onChange={e => { setProjectTitle(e.target.value); triggerAutosave(); }} />
             </div>
             <div>
               <Label>Contractor</Label>
-              <Input value={contractor} onChange={e => setContractor(e.target.value)} />
+              <Input value={contractor} onChange={e => { setContractor(e.target.value); triggerAutosave(); }} />
             </div>
           </div>
 
@@ -611,21 +760,21 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
 
           <div>
             <Label>Notes</Label>
-            <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4} placeholder="Any special notes or terms" />
+            <Textarea value={notes} onChange={e => { setNotes(e.target.value); triggerAutosave(); }} rows={4} placeholder="Any special notes or terms" />
           </div>
 
           <div>
             <Label>Terms and Conditions</Label>
             <Textarea
               value={termsAndConditions}
-              onChange={e => setTermsAndConditions(e.target.value)}
+              onChange={e => { setTermsAndConditions(e.target.value); triggerAutosave(); }}
               rows={6}
             />
             <div className="flex items-center space-x-2 mt-3">
               <Checkbox
                 id="showCalculatedValues"
                 checked={showCalculatedValuesInTerms}
-                onCheckedChange={(checked) => setShowCalculatedValuesInTerms(checked === true)}
+                onCheckedChange={(checked) => { setShowCalculatedValuesInTerms(checked === true); triggerAutosave(); }}
               />
               <Label htmlFor="showCalculatedValues" className="font-normal cursor-pointer">
                 Show calculated values (e.g., 50% (KES 50,000))
@@ -634,13 +783,46 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
           </div>
         </div>
 
-        <DialogFooter className="mt-6">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={submitting}>
-            <Calculator className="h-4 w-4 mr-2" />
-            {submitting ? 'Saving...' : 'Save Changes'}
-          </Button>
+        <DialogFooter className="mt-6 flex items-center justify-between">
+          <BOQSaveIndicator
+            isSaving={isSaving}
+            lastSavedTime={lastSavedTime}
+            hasUnsavedChanges={hasUnsavedChanges}
+          />
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => {
+              if (unsavedChangesRef.current) {
+                setShowUnsavedDialog(true);
+              } else {
+                onOpenChange(false);
+              }
+            }}>Cancel</Button>
+            <Button onClick={handleSave} disabled={submitting}>
+              <Calculator className="h-4 w-4 mr-2" />
+              {submitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
         </DialogFooter>
+
+        <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have unsaved changes. Are you sure you want to close without saving?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep Editing</AlertDialogCancel>
+              <AlertDialogAction onClick={() => {
+                setShowUnsavedDialog(false);
+                onOpenChange(false);
+              }}>
+                Discard Changes
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );

@@ -54,7 +54,7 @@ export interface BOQDraftRecord {
 /**
  * Save or update a BOQ draft to the database.
  * Uses upsert logic (update if exists, insert if new).
- * Only one draft per user per company is allowed.
+ * Only one draft per user per company is allowed (for creating new BOQs).
  */
 export async function saveBoqDraft(
   userId: string,
@@ -70,6 +70,7 @@ export async function saveBoqDraft(
     const payload = {
       company_id: companyId,
       user_id: userId,
+      boq_id: null,
       number: formData.boqNumber || null,
       boq_date: formData.boqDate || null,
       due_date: formData.dueDate || null,
@@ -96,11 +97,11 @@ export async function saveBoqDraft(
       last_autosaved_at: new Date().toISOString(),
     };
 
-    // Use upsert: on conflict (company_id, user_id), update the existing draft
+    // Use upsert: on conflict (company_id, user_id, boq_id), update the existing draft
     const { data, error } = await supabase
       .from('boq_drafts')
       .upsert([payload], {
-        onConflict: 'company_id,user_id',
+        onConflict: 'company_id,user_id,boq_id',
       })
       .select('id')
       .single();
@@ -271,8 +272,146 @@ export async function publishDraft(
 }
 
 /**
+ * Save a draft for an existing BOQ being edited.
+ * This creates/updates an edit-in-progress draft with boq_id set.
+ * Allows one edit draft per BOQ per user.
+ */
+export async function saveEditingDraft(
+  userId: string,
+  companyId: string,
+  boqId: string,
+  boqData: any
+): Promise<{ success: boolean; error?: string; draftId?: string }> {
+  try {
+    if (!userId || !companyId || !boqId) {
+      return { success: false, error: 'User ID, Company ID, and BOQ ID are required' };
+    }
+
+    const payload = {
+      company_id: companyId,
+      user_id: userId,
+      boq_id: boqId,
+      number: boqData.number || null,
+      boq_date: boqData.boq_date || null,
+      due_date: boqData.due_date || null,
+      customer_id: boqData.customer_id || null,
+      client_name: boqData.client_name || null,
+      client_email: boqData.client_email || null,
+      client_phone: boqData.client_phone || null,
+      client_address: boqData.client_address || null,
+      client_city: boqData.client_city || null,
+      client_country: boqData.client_country || null,
+      contractor: boqData.contractor || null,
+      project_title: boqData.project_title || null,
+      currency: boqData.currency || 'KES',
+      subtotal: boqData.subtotal || 0,
+      tax_amount: boqData.tax_amount || 0,
+      total_amount: boqData.total_amount || 0,
+      data: boqData.data,
+      terms_and_conditions: boqData.terms_and_conditions || null,
+      show_calculated_values_in_terms: boqData.show_calculated_values_in_terms || false,
+      updated_at: new Date().toISOString(),
+      last_autosaved_at: new Date().toISOString(),
+    };
+
+    // Use upsert: on conflict (company_id, user_id, boq_id), update the existing edit draft
+    const { data, error } = await supabase
+      .from('boq_drafts')
+      .upsert([payload], {
+        onConflict: 'company_id,user_id,boq_id',
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('Failed to save editing draft:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, draftId: data?.id };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('Error saving editing draft:', errorMsg);
+    return { success: false, error: errorMsg };
+  }
+}
+
+/**
+ * Load an edit draft for a specific BOQ.
+ * Returns null if no draft exists.
+ */
+export async function loadEditDraft(
+  userId: string,
+  companyId: string,
+  boqId: string
+): Promise<BOQDraftRecord | null> {
+  try {
+    if (!userId || !companyId || !boqId) {
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('boq_drafts')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('company_id', companyId)
+      .eq('boq_id', boqId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No rows found - expected when no draft exists
+        return null;
+      }
+      console.error('Failed to load edit draft:', error);
+      return null;
+    }
+
+    return data as BOQDraftRecord;
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('Error loading edit draft:', errorMsg);
+    return null;
+  }
+}
+
+/**
+ * Delete an edit draft for a specific BOQ.
+ * Called after successful save to clean up.
+ */
+export async function deleteEditDraft(
+  userId: string,
+  companyId: string,
+  boqId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!userId || !companyId || !boqId) {
+      return { success: false, error: 'User ID, Company ID, and BOQ ID are required' };
+    }
+
+    const { error } = await supabase
+      .from('boq_drafts')
+      .delete()
+      .eq('user_id', userId)
+      .eq('company_id', companyId)
+      .eq('boq_id', boqId);
+
+    if (error) {
+      console.error('Failed to delete edit draft:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('Error deleting edit draft:', errorMsg);
+    return { success: false, error: errorMsg };
+  }
+}
+
+/**
  * Check if a user has an unsaved draft for a company.
- * Returns true if draft exists.
+ * Returns true if draft exists (checks only create drafts with boq_id=NULL).
  */
 export async function hasDraft(
   userId: string,
@@ -283,7 +422,8 @@ export async function hasDraft(
       .from('boq_drafts')
       .select('id', { count: 'exact' })
       .eq('user_id', userId)
-      .eq('company_id', companyId);
+      .eq('company_id', companyId)
+      .is('boq_id', null);
 
     if (error) {
       console.error('Failed to check for draft:', error);

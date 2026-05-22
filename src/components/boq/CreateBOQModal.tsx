@@ -26,6 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Trash2, Calculator, Layers, Check } from 'lucide-react';
 import { useCompanies, useCustomers, useUnits, useBOQs } from '@/hooks/useDatabase';
 import { CreateUnitModal } from '@/components/units/CreateUnitModal';
+import { BOQSaveIndicator } from '@/components/boq/BOQSaveIndicator';
 import { toast } from 'sonner';
 import { downloadBOQPDF, BoqDocument } from '@/utils/boqPdfGenerator';
 import { generateNextBOQNumber } from '@/utils/boqNumberGenerator';
@@ -812,10 +813,17 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
           </div>
         </div>
 
-        <DialogFooter className="mt-6 flex justify-between">
-          <Button variant="destructive" onClick={handleClearForm}>
-            Clear Form
-          </Button>
+        <DialogFooter className="mt-6 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <Button variant="destructive" onClick={handleClearForm}>
+              Clear Form
+            </Button>
+            <BOQSaveIndicator
+              isSaving={draftSaved && lastAutosavedAt !== null}
+              lastSavedTime={lastAutosavedAt}
+              hasUnsavedChanges={false}
+            />
+          </div>
           <div className="space-x-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button onClick={handleGenerate} disabled={submitting}>
