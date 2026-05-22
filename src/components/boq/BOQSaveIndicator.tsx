@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 
 interface BOQSaveIndicatorProps {
   isSaving: boolean;
@@ -14,11 +14,26 @@ export function BOQSaveIndicator({
   hasUnsavedChanges,
   saveError,
 }: BOQSaveIndicatorProps) {
+  const [showSavingIndicator, setShowSavingIndicator] = useState(false);
+
+  useEffect(() => {
+    if (hasUnsavedChanges && !isSaving && !saveError) {
+      // Wait 1 second before showing "Autosaving in progress..." to avoid flicker
+      // (the 5-second debounce timer is counting down)
+      const timer = setTimeout(() => {
+        setShowSavingIndicator(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else {
+      setShowSavingIndicator(false);
+    }
+  }, [hasUnsavedChanges, isSaving, saveError]);
+
   if (saveError) {
     return (
       <div className="flex items-center gap-2 text-sm text-red-600">
         <AlertCircle className="h-4 w-4" />
-        <span title={saveError}>Save failed</span>
+        <span title={saveError}>Save failed — will retry</span>
       </div>
     );
   }
@@ -27,7 +42,16 @@ export function BOQSaveIndicator({
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        <span>Saving...</span>
+        <span>Saving draft...</span>
+      </div>
+    );
+  }
+
+  if (hasUnsavedChanges && showSavingIndicator) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-blue-600">
+        <Clock className="h-4 w-4" />
+        <span>Autosaving in progress...</span>
       </div>
     );
   }
