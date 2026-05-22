@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,7 +32,6 @@ import { downloadBOQPDF, BoqDocument } from '@/utils/boqPdfGenerator';
 import { generateNextBOQNumber } from '@/utils/boqNumberGenerator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useDebounce } from '@/hooks/useDebounce';
 import { saveBoqDraft, loadBoqDraft, deleteDraft } from '@/services/boqAutoSaveService';
 
 // Safe UUID generator that works in all environments
@@ -113,6 +112,10 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
   const [saveError, setSaveError] = useState<string | null>(null);
   const [draftLoaded, setDraftLoaded] = useState(false);
 
+  const pendingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingFormDataRef = useRef<any>(null);
+  const lastProfileRef = useRef(profile);
+
   const todayISO = new Date().toISOString().split('T')[0];
   const defaultNumber = useMemo(() => {
     return generateNextBOQNumber(existingBOQs);
@@ -184,9 +187,29 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
     }
   }, [open, previousTermsLoaded, draftLoaded, currentCompany?.id, profile?.id]);
 
-  // Create debounced autosave function
-  const debouncedAutoSave = useDebounce(async (formData: any) => {
-    if (!currentCompany?.id || !profile?.id) return;
+  // Cleanup pending autosaves on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingTimeoutRef.current) {
+        clearTimeout(pendingTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Warn if user logs out with unsaved changes
+  useEffect(() => {
+    if (lastProfileRef.current && !profile && pendingFormDataRef.current) {
+      console.warn('[CreateBOQModal] User logged out with pending autosave - data may not be saved');
+    }
+    lastProfileRef.current = profile;
+  }, [profile]);
+
+  // Autosave implementation with flush capability
+  const performAutosave = async (formData: any) => {
+    if (!currentCompany?.id || !profile?.id) {
+      console.warn('[CreateBOQModal] Autosave aborted: missing company or profile ID', { companyId: currentCompany?.id, profileId: profile?.id });
+      return;
+    }
 
     try {
       setIsSavingDraft(true);
@@ -226,7 +249,35 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
     } finally {
       setIsSavingDraft(false);
     }
-  }, 5000);
+  };
+
+  // Create debounced autosave function with manual flush capability
+  const debouncedAutoSave = (formData: any) => {
+    pendingFormDataRef.current = formData;
+
+    if (pendingTimeoutRef.current) {
+      clearTimeout(pendingTimeoutRef.current);
+    }
+
+    pendingTimeoutRef.current = setTimeout(() => {
+      if (pendingFormDataRef.current) {
+        performAutosave(pendingFormDataRef.current);
+        pendingFormDataRef.current = null;
+      }
+    }, 5000);
+  };
+
+  // Flush pending autosave when modal closes
+  const flushPendingAutosave = async () => {
+    if (pendingTimeoutRef.current) {
+      clearTimeout(pendingTimeoutRef.current);
+      pendingTimeoutRef.current = null;
+    }
+    if (pendingFormDataRef.current) {
+      await performAutosave(pendingFormDataRef.current);
+      pendingFormDataRef.current = null;
+    }
+  };
 
   // Autosave whenever form state changes
   useEffect(() => {
@@ -530,8 +581,10 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
     }
   };
 
-  const handleOpenChange = (newOpen: boolean) => {
+  const handleOpenChange = async (newOpen: boolean) => {
     if (!newOpen) {
+      // Flush any pending autosave before closing
+      await flushPendingAutosave();
       setPreviousTermsLoaded(false);
       setDraftLoaded(false);
     }
