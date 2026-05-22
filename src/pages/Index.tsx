@@ -4,11 +4,15 @@ import { DashboardSummaryCards } from '@/components/dashboard/DashboardSummaryCa
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { useCompanies } from '@/hooks/useDatabase';
+import { useAuth } from '@/contexts/AuthContext';
 import SEO from '@/components/SEO';
 
 const Index = () => {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const { data: companies } = useCompanies();
+
+  const isSalesAccount = profile?.email === 'sales@layonsconstruction.com';
 
   const handleDrillDown = (module: string, filterType: string) => {
     // Navigate to the appropriate module with filter state
@@ -51,7 +55,7 @@ const Index = () => {
       <DashboardStats />
 
       {/* Dashboard Summary Cards with Drill-down */}
-      <DashboardSummaryCards onDrill={handleDrillDown} />
+      {!isSalesAccount && <DashboardSummaryCards onDrill={handleDrillDown} />}
 
       {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-3">
