@@ -45,19 +45,15 @@ export function AuditLogs() {
     );
   }
 
-  // Check if user has appropriate permissions
-  // Note: In a properly configured system, only admin users should see this page via ProtectedRoute
-  // If they reach this page while authenticated, allow them to view audit logs
-  // This assumes role-based routing is working and non-admins can't access /audit-logs route
-  const hasAccess = !!user;
+  const isSalesAccount = profile?.email?.toLowerCase() === 'sales@layonsconstruction.com';
 
-  if (!hasAccess) {
+  if (isSalesAccount) {
     return (
       <div className="space-y-6 p-6">
         <Alert className="border-red-200 bg-red-50">
           <AlertCircle className="h-4 w-4 text-red-600" />
           <AlertDescription className="text-red-900">
-            You don't have permission to access audit logs. Only administrators can view system audit trails.
+            You don't have permission to access audit logs.
           </AlertDescription>
         </Alert>
 
@@ -68,8 +64,7 @@ export function AuditLogs() {
           </CardHeader>
           <CardContent>
             <p className="text-slate-600">
-              Audit logs contain sensitive information about user activities and deletions. Access is restricted to
-              system administrators and compliance officers.
+              Audit logs contain sensitive information about user activities. Access is restricted to system administrators.
             </p>
             <p className="text-slate-600 mt-4">
               If you believe you should have access, please contact your system administrator.

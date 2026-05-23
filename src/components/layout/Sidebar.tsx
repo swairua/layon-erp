@@ -101,14 +101,25 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }:
   const { profile } = useAuth();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
-  const isSalesAccount = profile?.email === 'sales@layonsconstruction.com';
+  // Check if this is the sales account by comparing email
+  const isSalesAccount = profile?.email?.toLowerCase() === 'sales@layonsconstruction.com';
 
-  const filteredSidebarItems = sidebarItems.filter(item => {
-    if (isSalesAccount) {
-      return !['Payments', 'Audit Logs', 'Settings'].includes(item.title);
+  useEffect(() => {
+    if (profile) {
+      console.log('🔍 Sidebar - Profile email:', profile.email, 'isSalesAccount:', isSalesAccount);
     }
-    return true;
-  });
+  }, [profile?.email, isSalesAccount]);
+
+  // Filter sidebar items based on user role
+  const filteredSidebarItems = useMemo(() => {
+    return sidebarItems.filter(item => {
+      // Hide these items for sales accounts
+      if (isSalesAccount && ['Payments', 'Audit Logs', 'Settings'].includes(item.title)) {
+        return false;
+      }
+      return true;
+    });
+  }, [isSalesAccount]);
 
   const toggleExpanded = (title: string) => {
     setExpandedItems(prev => 
