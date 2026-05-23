@@ -560,16 +560,16 @@ Website:`;
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Invoices</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Invoices</h1>
+          <p className="text-muted-foreground text-sm md:text-base">
             Create and manage customer invoices
           </p>
         </div>
         <Button
-          className="gradient-primary text-primary-foreground hover:opacity-90 shadow-card"
-          size="lg"
+          className="gradient-primary text-primary-foreground hover:opacity-90 shadow-card w-full md:w-auto"
+          size="sm"
           onClick={() => setShowCreateModal(true)}
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -580,24 +580,24 @@ Website:`;
       {/* Filters and Search */}
       <Card className="shadow-card">
         <CardContent className="pt-6">
-          <div className="flex items-center space-x-4">
-            <div className="relative flex-1 max-w-md">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:space-x-4">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search invoices by customer or number..."
+                placeholder="Search invoices..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 text-sm"
               />
             </div>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline">
+                <Button variant="outline" size="sm" className="w-full sm:w-auto">
                   <Filter className="h-4 w-4 mr-2" />
                   Filter
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-80">
+              <PopoverContent className="w-72 sm:w-80">
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="status-filter">Status</Label>
@@ -616,23 +616,25 @@ Website:`;
                     </Select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div className="space-y-2">
-                      <Label htmlFor="date-from">Invoice Date From</Label>
+                      <Label htmlFor="date-from" className="text-xs sm:text-sm">Invoice Date From</Label>
                       <Input
                         id="date-from"
                         type="date"
                         value={dateFromFilter}
                         onChange={(e) => setDateFromFilter(e.target.value)}
+                        className="text-xs sm:text-sm"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="date-to">Invoice Date To</Label>
+                      <Label htmlFor="date-to" className="text-xs sm:text-sm">Invoice Date To</Label>
                       <Input
                         id="date-to"
                         type="date"
                         value={dateToFilter}
                         onChange={(e) => setDateToFilter(e.target.value)}
+                        className="text-xs sm:text-sm"
                       />
                     </div>
                   </div>

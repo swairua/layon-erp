@@ -183,24 +183,24 @@ export function StockAdjustmentModal({ open, onOpenChange, onSuccess, item }: St
               <CardTitle className="text-lg">Current Stock Information</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                 <div>
-                  <Label className="text-sm text-muted-foreground">Product Name</Label>
-                  <p className="font-medium">{item.name}</p>
+                  <Label className="text-xs sm:text-sm text-muted-foreground">Product Name</Label>
+                  <p className="font-medium text-sm md:text-base">{item.name}</p>
                 </div>
                 <div>
-                  <Label className="text-sm text-muted-foreground">Product Code</Label>
-                  <p className="font-medium">{item.product_code}</p>
+                  <Label className="text-xs sm:text-sm text-muted-foreground">Product Code</Label>
+                  <p className="font-medium text-sm md:text-base">{item.product_code}</p>
                 </div>
                 <div>
-                  <Label className="text-sm text-muted-foreground">Current Stock</Label>
-                  <p className="font-medium text-lg">
+                  <Label className="text-xs sm:text-sm text-muted-foreground">Current Stock</Label>
+                  <p className="font-medium text-base md:text-lg">
                     {item.stock_quantity} {item.unit_of_measure}
                   </p>
                 </div>
                 <div>
-                  <Label className="text-sm text-muted-foreground">Unit of Measure</Label>
-                  <p className="font-medium">{item.unit_of_measure}</p>
+                  <Label className="text-xs sm:text-sm text-muted-foreground">Unit of Measure</Label>
+                  <p className="font-medium text-sm md:text-base">{item.unit_of_measure}</p>
                 </div>
               </div>
             </CardContent>

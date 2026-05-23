@@ -422,17 +422,17 @@ export default function BOQs() {
         title="Bill of Quantities (BOQs)"
         description="Manage your project estimates, material requirements, and costs with our professional BOQ tool."
       />
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">BOQs</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">BOQs</h1>
+          <p className="text-muted-foreground text-sm md:text-base">
             Create and manage bill of quantities
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:gap-2 w-full sm:w-auto">
           <Button
-            className="gradient-primary text-primary-foreground hover:opacity-90 shadow-card"
-            size="lg"
+            className="gradient-primary text-primary-foreground hover:opacity-90 shadow-card w-full sm:w-auto"
+            size="sm"
             onClick={() => setPercentageCopyOpen(true)}
             variant="outline"
           >
@@ -440,8 +440,8 @@ export default function BOQs() {
             Copy with %
           </Button>
           <Button
-            className="gradient-primary text-primary-foreground hover:opacity-90 shadow-card"
-            size="lg"
+            className="gradient-primary text-primary-foreground hover:opacity-90 shadow-card w-full sm:w-auto"
+            size="sm"
             onClick={() => setOpen(true)}
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -453,24 +453,24 @@ export default function BOQs() {
       {showDraftBanner && draftExists && (
         <Card className="border-blue-200 bg-blue-50 shadow-sm">
           <CardContent className="pt-6">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-3">
-                <AlertCircle className="h-5 w-5 text-blue-600" />
+                <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0" />
                 <div>
-                  <p className="font-medium text-blue-900">You have an unsaved BOQ in progress</p>
-                  <p className="text-sm text-blue-700">
+                  <p className="font-medium text-blue-900 text-sm md:text-base">You have an unsaved BOQ in progress</p>
+                  <p className="text-xs md:text-sm text-blue-700">
                     Last saved: {draftLastSaved ? new Date(draftLastSaved).toLocaleString() : 'just now'}
                   </p>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-col sm:flex-row w-full md:w-auto">
                 <Button
                   size="sm"
                   onClick={() => {
                     setOpen(true);
                     setShowDraftBanner(false);
                   }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
                 >
                   Continue Editing
                 </Button>
@@ -478,7 +478,7 @@ export default function BOQs() {
                   size="sm"
                   variant="outline"
                   onClick={handleResetDraft}
-                  className="border-blue-200 hover:bg-blue-100"
+                  className="border-blue-200 hover:bg-blue-100 w-full sm:w-auto"
                 >
                   Reset Draft
                 </Button>
@@ -486,7 +486,7 @@ export default function BOQs() {
                   size="icon"
                   variant="ghost"
                   onClick={() => setShowDraftBanner(false)}
-                  className="h-8 w-8"
+                  className="h-8 w-8 self-start sm:self-auto"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -503,42 +503,44 @@ export default function BOQs() {
       {/* Filters and Search */}
       <Card className="shadow-card">
         <CardContent className="pt-6">
-          <div className="flex items-center space-x-4">
-            <div className="relative flex-1 max-w-md">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:space-x-4">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search BOQs by number or client..."
+                placeholder="Search BOQs..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 text-sm"
               />
             </div>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline">
+                <Button variant="outline" size="sm" className="w-full sm:w-auto">
                   <Filter className="h-4 w-4 mr-2" />
                   Filter
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-80">
+              <PopoverContent className="w-72 sm:w-80">
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div className="space-y-2">
-                      <Label htmlFor="due-date-from">Due Date From</Label>
+                      <Label htmlFor="due-date-from" className="text-xs sm:text-sm">Due Date From</Label>
                       <Input
                         id="due-date-from"
                         type="date"
                         value={dueDateFromFilter}
                         onChange={(e) => setDueDateFromFilter(e.target.value)}
+                        className="text-xs sm:text-sm"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="due-date-to">Due Date To</Label>
+                      <Label htmlFor="due-date-to" className="text-xs sm:text-sm">Due Date To</Label>
                       <Input
                         id="due-date-to"
                         type="date"
                         value={dueDateToFilter}
                         onChange={(e) => setDueDateToFilter(e.target.value)}
+                        className="text-xs sm:text-sm"
                       />
                     </div>
                   </div>
@@ -645,84 +647,88 @@ export default function BOQs() {
             <div>No BOQs found</div>
           ) : (
             <div className="space-y-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Number</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead>Client</TableHead>
-                    <TableHead>Project</TableHead>
-                    <TableHead>Currency</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedBOQs.map((b: any) => (
-                    <TableRow key={b.id}>
-                      <TableCell>{b.number}</TableCell>
-                      <TableCell>{new Date(b.boq_date).toLocaleDateString()}</TableCell>
-                      <TableCell>{b.due_date ? new Date(b.due_date).toLocaleDateString() : '-'}</TableCell>
-                      <TableCell>{b.client_name}</TableCell>
-                      <TableCell>{b.project_title || '-'}</TableCell>
-                      <TableCell><Badge variant="outline">{b.currency || 'KES'}</Badge></TableCell>
-                      <TableCell>
-                        <Badge variant={b.status === 'converted' ? 'default' : b.status === 'cancelled' ? 'destructive' : 'secondary'}>
-                          {b.status === 'draft' ? 'Draft' : b.status === 'converted' ? 'Converted' : 'Cancelled'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">{new Intl.NumberFormat('en-KE', { style: 'currency', currency: b.currency || 'KES' }).format(Number(b.total_amount || b.subtotal || 0))}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button size="icon" variant="ghost" onClick={() => setViewing(b)} title="View">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" onClick={() => setEditing(b)} title="Edit">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" onClick={() => handleDownloadPDF(b)} title="Download PDF">
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          {b.number === 'BOQ-20251124-1441' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-xs"
-                              onClick={() => {
-                                setPercentageRateBoq(b);
-                                setPercentageRateOpen(true);
-                              }}
-                              title="Download Special Invoice PDF"
-                            >
-                              Invoice PDF
-                            </Button>
-                          )}
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() => handleConvertClick(b.id, b.number)}
-                            title="Convert to Invoice"
-                            disabled={b.converted_to_invoice_id !== null && b.converted_to_invoice_id !== undefined}
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="destructive"
-                            onClick={() => handleDeleteClick(b.id, b.number)}
-                            title={b.converted_to_invoice_id ? "Cannot delete converted BOQ" : "Delete"}
-                            disabled={!!b.converted_to_invoice_id}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+              <div className="overflow-x-auto -mx-6 px-6 md:overflow-x-visible md:mx-0 md:px-0">
+                <Table className="min-w-full">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs md:text-sm">Number</TableHead>
+                      <TableHead className="text-xs md:text-sm">Date</TableHead>
+                      <TableHead className="text-xs md:text-sm">Due Date</TableHead>
+                      <TableHead className="hidden sm:table-cell text-xs md:text-sm">Client</TableHead>
+                      <TableHead className="hidden lg:table-cell text-xs md:text-sm">Project</TableHead>
+                      <TableHead className="text-xs md:text-sm">Currency</TableHead>
+                      <TableHead className="text-xs md:text-sm">Status</TableHead>
+                      <TableHead className="text-right text-xs md:text-sm">Total</TableHead>
+                      <TableHead className="text-xs md:text-sm">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedBOQs.map((b: any) => (
+                      <TableRow key={b.id}>
+                        <TableCell className="text-xs md:text-sm">{b.number}</TableCell>
+                        <TableCell className="text-xs md:text-sm">{new Date(b.boq_date).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-xs md:text-sm">{b.due_date ? new Date(b.due_date).toLocaleDateString() : '-'}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-xs md:text-sm">{b.client_name}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-xs md:text-sm">{b.project_title || '-'}</TableCell>
+                        <TableCell className="text-xs md:text-sm"><Badge variant="outline" className="text-xs">{b.currency || 'KES'}</Badge></TableCell>
+                        <TableCell className="text-xs md:text-sm">
+                          <Badge variant={b.status === 'converted' ? 'default' : b.status === 'cancelled' ? 'destructive' : 'secondary'} className="text-xs">
+                            {b.status === 'draft' ? 'Draft' : b.status === 'converted' ? 'Converted' : 'Cancelled'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-xs md:text-sm">{new Intl.NumberFormat('en-KE', { style: 'currency', currency: b.currency || 'KES' }).format(Number(b.total_amount || b.subtotal || 0))}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 md:gap-2 flex-wrap">
+                            <Button size="icon" variant="ghost" onClick={() => setViewing(b)} title="View" className="h-8 w-8 md:h-9 md:w-9">
+                              <Eye className="h-3 w-3 md:h-4 md:w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" onClick={() => setEditing(b)} title="Edit" className="h-8 w-8 md:h-9 md:w-9">
+                              <Pencil className="h-3 w-3 md:h-4 md:w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" onClick={() => handleDownloadPDF(b)} title="Download PDF" className="h-8 w-8 md:h-9 md:w-9">
+                              <Download className="h-3 w-3 md:h-4 md:w-4" />
+                            </Button>
+                            {b.number === 'BOQ-20251124-1441' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs"
+                                onClick={() => {
+                                  setPercentageRateBoq(b);
+                                  setPercentageRateOpen(true);
+                                }}
+                                title="Download Special Invoice PDF"
+                              >
+                                Invoice
+                              </Button>
+                            )}
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              onClick={() => handleConvertClick(b.id, b.number)}
+                              title="Convert to Invoice"
+                              disabled={b.converted_to_invoice_id !== null && b.converted_to_invoice_id !== undefined}
+                              className="h-8 w-8 md:h-9 md:w-9"
+                            >
+                              <FileText className="h-3 w-3 md:h-4 md:w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="destructive"
+                              onClick={() => handleDeleteClick(b.id, b.number)}
+                              title={b.converted_to_invoice_id ? "Cannot delete converted BOQ" : "Delete"}
+                              disabled={!!b.converted_to_invoice_id}
+                              className="h-8 w-8 md:h-9 md:w-9"
+                            >
+                              <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
               <PaginationControls
                 currentPage={pagination.currentPage}
                 totalPages={pagination.totalPages}

@@ -618,16 +618,16 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[95vw] max-w-7xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-4xl md:max-w-7xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <DialogTitle className="flex items-center space-x-2">
-                <Layers className="h-5 w-5 text-primary" />
-                <span>Create Bill of Quantities</span>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center space-x-2 md:space-x-4">
+              <DialogTitle className="flex items-center space-x-2 text-lg md:text-base">
+                <Layers className="h-5 w-5 text-primary flex-shrink-0" />
+                <span className="break-words">Create Bill of Quantities</span>
               </DialogTitle>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:space-x-4">
               <BOQSaveIndicator
                 isSaving={isSavingDraft}
                 lastSavedTime={lastAutosavedAt}
@@ -635,7 +635,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
                 saveError={saveError}
               />
               {lastAutosavedAt && (
-                <Button variant="outline" size="sm" onClick={handleClearForm}>
+                <Button variant="outline" size="sm" onClick={handleClearForm} className="w-full sm:w-auto">
                   Reset Draft
                 </Button>
               )}
@@ -647,7 +647,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
         </DialogHeader>
 
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             <div>
               <Label>BOQ Number</Label>
               <Input value={boqNumber} onChange={e => { setBoqNumber(e.target.value); markChanged(); }} />
@@ -877,13 +877,13 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
           </div>
         </div>
 
-        <DialogFooter className="mt-6 flex justify-between items-center">
-          <Button variant="destructive" onClick={handleClearForm}>
+        <DialogFooter className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+          <Button variant="destructive" onClick={handleClearForm} className="w-full sm:w-auto">
             Clear Form
           </Button>
-          <div className="space-x-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={handleGenerate} disabled={submitting}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:space-x-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">Cancel</Button>
+            <Button onClick={handleGenerate} disabled={submitting} className="w-full sm:w-auto">
               <Calculator className="h-4 w-4 mr-2" />
               {submitting ? 'Generating...' : 'Download BOQ PDF'}
             </Button>

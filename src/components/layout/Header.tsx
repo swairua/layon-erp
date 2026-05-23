@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, Search, User, LogOut, LogIn } from 'lucide-react';
+import { Bell, Search, User, LogOut, LogIn, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -16,7 +16,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { SignInModal } from '@/components/auth/SignInModal';
 import { ForgotPasswordModal } from '@/components/auth/ForgotPasswordModal';
 
-export function Header() {
+interface HeaderProps {
+  sidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
+}
+
+export function Header({ sidebarOpen = false, onToggleSidebar = () => {} }: HeaderProps) {
   const { user, profile, signOut, isAuthenticated } = useAuth();
   const [authModal, setAuthModal] = useState<'signin' | 'forgot' | null>(null);
 
@@ -65,24 +70,34 @@ export function Header() {
 
   return (
     <>
-      <header className="flex h-16 items-center justify-between border-b border-border bg-card px-6 shadow-card">
+      <header className="flex h-16 items-center justify-between border-b border-border bg-card px-4 md:px-6 shadow-card">
+        {/* Hamburger Menu - Mobile Only */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggleSidebar}
+          className="md:hidden"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+
         {/* Search */}
-        <div className="flex items-center space-x-4 flex-1 max-w-lg">
-          <div className="relative flex-1">
+        <div className="flex items-center space-x-2 md:space-x-4 flex-1 max-w-lg md:max-w-lg">
+          <div className="relative flex-1 max-w-xs md:max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search customers, invoices, products..."
-              className="pl-10 bg-muted/50 border-muted focus:bg-background transition-smooth"
+              placeholder="Search..."
+              className="pl-10 bg-muted/50 border-muted focus:bg-background transition-smooth text-sm"
             />
           </div>
         </div>
 
         {/* Right side */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2 md:space-x-4">
           {isAuthenticated && (
             <>
               {/* Notifications */}
-              <Button variant="ghost" size="icon" className="relative">
+              <Button variant="ghost" size="icon" className="relative hidden sm:inline-flex">
                 <Bell className="h-5 w-5" />
                 <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-xs text-destructive-foreground flex items-center justify-center">
                   3
@@ -92,13 +107,13 @@ export function Header() {
               {/* User Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center space-x-3 px-3">
+                  <Button variant="ghost" className="flex items-center space-x-2 md:space-x-3 px-2 md:px-3">
                     <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-primary text-primary-foreground font-medium">
+                      <AvatarFallback className="bg-primary text-primary-foreground font-medium text-xs">
                         {profile?.full_name ? getInitials(profile.full_name) : 'U'}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex flex-col items-start">
+                    <div className="hidden sm:flex flex-col items-start">
                       <span className="text-sm font-medium">
                         {profile?.full_name || user?.email || 'User'}
                       </span>
@@ -107,8 +122,8 @@ export function Header() {
                           {profile?.role ? getRoleDisplay(profile.role) : 'User'}
                         </span>
                         {profile?.role && (
-                          <Badge 
-                            variant="outline" 
+                          <Badge
+                            variant="outline"
                             className={`text-xs px-1 py-0 h-4 ${getRoleColor(profile.role)}`}
                           >
                             {profile.role.toUpperCase()}

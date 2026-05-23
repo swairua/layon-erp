@@ -13,6 +13,7 @@ export function Layout({ children }: LayoutProps) {
   const { isAuthenticated, loading } = useAuth();
   const location = useLocation();
   const [loadingStartTime] = useState(Date.now());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Routes that don't require authentication
   const publicRoutes = ['/auth-test', '/manual-setup', '/database-fix-page', '/auto-fix', '/audit', '/auto-payment-sync', '/payment-sync', '/admin-recreate'];
@@ -67,10 +68,29 @@ export function Layout({ children }: LayoutProps) {
   // Show authenticated layout
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar />
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block">
+        <Sidebar isMobile={false} isOpen={true} onClose={() => {}} />
+      </div>
+
+      {/* Mobile Sidebar Drawer */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className="md:hidden">
+        <Sidebar
+          isMobile={true}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
+      </div>
+
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+        <Header sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
           {children}
         </main>
       </div>

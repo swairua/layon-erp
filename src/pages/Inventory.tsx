@@ -202,19 +202,19 @@ export default function Inventory() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Inventory</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Inventory</h1>
+          <p className="text-muted-foreground text-sm md:text-base">
             Manage stock levels and inventory items
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          <Button variant="outline" onClick={handleStockAdjustment}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:gap-2 w-full sm:w-auto">
+          <Button variant="outline" size="sm" onClick={handleStockAdjustment} className="w-full sm:w-auto">
             <Package className="h-4 w-4 mr-2" />
             Stock Adjustment
           </Button>
-          <Button className="gradient-primary text-primary-foreground hover:opacity-90 shadow-card" size="lg" onClick={handleAddItem}>
+          <Button className="gradient-primary text-primary-foreground hover:opacity-90 shadow-card w-full sm:w-auto" size="sm" onClick={handleAddItem}>
             <Plus className="h-4 w-4 mr-2" />
             Add Item
           </Button>

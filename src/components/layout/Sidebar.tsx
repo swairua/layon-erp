@@ -17,10 +17,12 @@ import {
   FileText,
   Truck,
   History,
+  X,
 } from 'lucide-react';
 import { BiolegendLogo } from '@/components/ui/biolegend-logo';
 import { useCurrentCompany } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 
 interface SidebarItem {
   title: string;
@@ -87,7 +89,13 @@ const sidebarItems: SidebarItem[] = [
   }
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  isMobile?: boolean;
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }: SidebarProps) {
   const location = useLocation();
   const { currentCompany } = useCurrentCompany();
   const { profile } = useAuth();
@@ -188,6 +196,52 @@ export function Sidebar() {
       </Link>
     );
   };
+
+  if (isMobile) {
+    return (
+      <div
+        className={cn(
+          "fixed left-0 top-0 z-50 flex h-screen w-64 flex-col bg-sidebar border-r border-sidebar-border transition-transform duration-300 ease-in-out transform",
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        {/* Company Logo/Header */}
+        <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-6">
+          <BiolegendLogo size="lg" showText={true} className="text-sidebar-foreground" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="md:hidden"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 space-y-2 p-4 custom-scrollbar overflow-y-auto">
+          {filteredSidebarItems.map(item => (
+            <div key={item.title} onClick={onClose}>
+              {renderSidebarItem(item)}
+            </div>
+          ))}
+        </nav>
+
+        {/* Company Info */}
+        <div className="border-t border-sidebar-border p-4">
+          <div className="space-y-2">
+            <div className="flex items-center space-x-3 px-3 py-2 text-sm text-sidebar-foreground">
+              <Building2 className="h-4 w-4 text-sidebar-primary" />
+              <div className="min-w-0">
+                <div className="font-medium truncate">{currentCompany?.name || 'Company'}</div>
+                <div className="text-xs text-sidebar-foreground/60 truncate">{currentCompany?.city || currentCompany?.country || 'Management'}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full w-64 flex-col bg-sidebar border-r border-sidebar-border">

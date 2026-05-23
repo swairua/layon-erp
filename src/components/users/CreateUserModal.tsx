@@ -132,16 +132,16 @@ export function CreateUserModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
-          <DialogTitle>Create New User</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-lg md:text-base">Create New User</DialogTitle>
+          <DialogDescription className="text-xs md:text-sm">
             Add a new user to your organization with specific role and permissions.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
             <div className="space-y-2">
               <Label htmlFor="full_name">Full Name *</Label>
               <div className="relative">

@@ -358,16 +358,16 @@ Website: www.biolegendscientific.co.ke`;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Quotations</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Quotations</h1>
+          <p className="text-muted-foreground text-sm md:text-base">
             Create and manage customer quotations
           </p>
         </div>
-        <Button 
-          className="gradient-primary text-primary-foreground hover:opacity-90 shadow-card"
-          size="lg"
+        <Button
+          className="gradient-primary text-primary-foreground hover:opacity-90 shadow-card w-full md:w-auto"
+          size="sm"
           onClick={() => setShowCreateModal(true)}
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -377,17 +377,17 @@ Website: www.biolegendscientific.co.ke`;
 
       <Card className="shadow-card">
         <CardContent className="pt-6">
-          <div className="flex items-center space-x-4">
-            <div className="relative flex-1 max-w-md">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:space-x-4">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search quotations by customer or number..."
+                placeholder="Search quotations..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 text-sm"
               />
             </div>
-            <Button variant="outline" onClick={handleFilter}>
+            <Button variant="outline" size="sm" onClick={handleFilter} className="w-full sm:w-auto">
               <Filter className="h-4 w-4 mr-2" />
               Filter
             </Button>
