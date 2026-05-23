@@ -280,20 +280,39 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
     if (open && boq && profile?.id && currentCompany?.id) {
       // Check if there's an edit draft for this BOQ
       const checkAndLoadDraft = async () => {
+        console.log('[EditBOQModal] Loading BOQ:', { id: boq.id, number: boq.number, hasData: !!boq.data });
+
         const editDraft = await loadEditDraft(profile.id, currentCompany.id, boq.id);
+        console.log('[EditBOQModal] Edit draft found:', !!editDraft);
 
         // Load from draft if it exists and is newer than published version
-        const dataToUse = editDraft && new Date(editDraft.updated_at) > new Date(boq.updated_at)
-          ? editDraft
-          : boq;
+        let dataToUse = boq;
+        if (editDraft) {
+          try {
+            const draftUpdated = new Date(editDraft.updated_at);
+            const boqUpdated = new Date(boq.updated_at);
+            if (draftUpdated > boqUpdated) {
+              dataToUse = editDraft;
+            }
+          } catch (err) {
+            console.error('[EditBOQModal] Error comparing dates:', err);
+            // Fall back to using boq if date comparison fails
+          }
+        }
+
+        console.log('[EditBOQModal] Using data from:', dataToUse.id === editDraft?.id ? 'draft' : 'boq');
 
         // Safely extract boq data with fallbacks
         const boqData = dataToUse.data || {};
 
         // Set basic fields from dataToUse (top-level fields)
-        setBoqNumber(dataToUse.number || '');
-        setBoqDate(dataToUse.boq_date || '');
-        setDueDate(dataToUse.due_date || '');
+        const boqNum = dataToUse.number || '';
+        const boqDateVal = dataToUse.boq_date || '';
+        const dueDateVal = dataToUse.due_date || '';
+
+        setBoqNumber(boqNum);
+        setBoqDate(boqDateVal);
+        setDueDate(dueDateVal);
 
         // Set fields that may be in data object or top-level
         setProjectTitle(dataToUse.project_title || boqData.project_title || '');
@@ -309,31 +328,48 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
         const currencyToUse = dataToUse.currency || boqData.currency || 'KES';
         setCurrency(currencyToUse);
 
-        // Set client ID from client_name
-        const clientIdFromBoq = customers.find(c => c.name === dataToUse.client_name)?.id;
+        // Set client ID from client_name - with null check
+        const clientName = dataToUse.client_name || boqData.client_name;
+        const clientIdFromBoq = clientName ? customers.find(c => c.name === clientName)?.id : undefined;
         if (clientIdFromBoq) {
           setClientId(clientIdFromBoq);
         }
 
-        // Load sections with proper fallback
-        if (boqData.sections && Array.isArray(boqData.sections) && boqData.sections.length > 0) {
-          const loadedSections: BOQSectionRow[] = boqData.sections.map((section: any) => ({
-            id: `section-${generateSafeUUID()}`,
-            title: section.title || 'General',
-            subsections: (section.subsections || []).map((subsection: any) => ({
-              id: `subsection-${generateSafeUUID()}`,
-              name: subsection.name,
-              label: subsection.label,
-              items: (subsection.items || []).map((item: any) => ({
-                id: `item-${generateSafeUUID()}`,
-                description: item.description || '',
-                quantity: item.quantity || 1,
-                unit: item.unit_id || '',
-                rate: item.rate || 0,
-              })),
-            })),
-          }));
-          setSections(loadedSections);
+        // Load sections with proper fallback and validation
+        const sections = boqData.sections;
+        if (sections && Array.isArray(sections) && sections.length > 0) {
+          try {
+            const loadedSections: BOQSectionRow[] = sections.map((section: any) => {
+              // Ensure subsections is an array
+              const subsectionsArray = Array.isArray(section.subsections) ? section.subsections : [];
+
+              return {
+                id: `section-${generateSafeUUID()}`,
+                title: section.title || 'General',
+                subsections: subsectionsArray.map((subsection: any) => {
+                  // Ensure items is an array
+                  const itemsArray = Array.isArray(subsection.items) ? subsection.items : [];
+
+                  return {
+                    id: `subsection-${generateSafeUUID()}`,
+                    name: subsection.name || '',
+                    label: subsection.label || '',
+                    items: itemsArray.map((item: any) => ({
+                      id: `item-${generateSafeUUID()}`,
+                      description: item.description || '',
+                      quantity: Number(item.quantity) || 1,
+                      unit: item.unit_id || '',
+                      rate: Number(item.rate) || 0,
+                    })),
+                  };
+                }),
+              };
+            });
+            setSections(loadedSections);
+          } catch (err) {
+            console.error('Error loading sections:', err);
+            setSections([defaultSection()]);
+          }
         } else {
           // No sections found, use default
           setSections([defaultSection()]);
@@ -343,6 +379,17 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
         if (editDraft) {
           setLastSavedTime(editDraft.last_autosaved_at);
         }
+
+        // Log warning if critical data is missing
+        if (!boqNum || !boqDateVal || !clientIdFromBoq) {
+          console.warn('[EditBOQModal] Missing critical BOQ data:', {
+            boqNumber: boqNum || 'MISSING',
+            boqDate: boqDateVal || 'MISSING',
+            clientId: clientIdFromBoq || 'MISSING',
+            clientName: clientName,
+          });
+        }
+
         setHasUnsavedChanges(false);
         unsavedChangesRef.current = false;
       };
@@ -564,7 +611,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
         total_amount: filledSubtotal,
         data: doc,
         terms_and_conditions: termsAndConditions || null,
-        showCalculatedValuesInTerms: showCalculatedValuesInTerms,
+        show_calculated_values_in_terms: showCalculatedValuesInTerms,
       };
 
       const { error: updateError } = await supabase.from('boqs').update(payload).eq('id', boq.id);
