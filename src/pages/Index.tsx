@@ -5,22 +5,20 @@ import { DashboardSummaryCards } from '@/components/dashboard/DashboardSummaryCa
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { useCompanies } from '@/hooks/useDatabase';
-import { useAuth } from '@/contexts/AuthContext';
+import { useIsSalesAccount } from '@/contexts/AuthContext';
 import SEO from '@/components/SEO';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { isSalesAccount, isLoading } = useIsSalesAccount();
   const { data: companies } = useCompanies();
 
-  const isSalesAccount = profile?.email?.toLowerCase() === 'sales@layonsconstruction.com';
-
   useEffect(() => {
-    if (profile?.email) {
-      console.log('📊 Dashboard - Profile email:', profile.email, 'Normalized:', profile.email.toLowerCase(), 'isSalesAccount:', isSalesAccount);
+    if (!isLoading) {
+      console.log('📊 Dashboard - isSalesAccount:', isSalesAccount, 'isLoading:', isLoading);
       console.log('📊 Dashboard - DashboardStats visible:', !isSalesAccount, 'DashboardSummaryCards visible:', !isSalesAccount);
     }
-  }, [profile?.email, isSalesAccount]);
+  }, [isLoading, isSalesAccount]);
 
   const handleDrillDown = (module: string, filterType: string) => {
     // Navigate to the appropriate module with filter state

@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { BiolegendLogo } from '@/components/ui/biolegend-logo';
 import { useCurrentCompany } from '@/contexts/CompanyContext';
-import { useAuth } from '@/contexts/AuthContext';
+import { useIsSalesAccount } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 
 interface SidebarItem {
@@ -98,11 +98,8 @@ interface SidebarProps {
 export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }: SidebarProps) {
   const location = useLocation();
   const { currentCompany } = useCurrentCompany();
-  const { profile } = useAuth();
+  const { isSalesAccount, isLoading } = useIsSalesAccount();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
-
-  // Check if this is the sales account by comparing email
-  const isSalesAccount = profile?.email?.toLowerCase() === 'sales@layonsconstruction.com';
 
   // Filter sidebar items based on user role
   const filteredSidebarItems = useMemo(() => {
@@ -116,11 +113,11 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }:
   }, [isSalesAccount]);
 
   useEffect(() => {
-    if (profile?.email) {
-      console.log('🔍 Sidebar - Profile email:', profile.email, 'Normalized:', profile.email.toLowerCase(), 'isSalesAccount:', isSalesAccount);
+    if (!isLoading) {
+      console.log('🔍 Sidebar - isSalesAccount:', isSalesAccount, 'isLoading:', isLoading);
       console.log('📋 Sidebar filtered items:', filteredSidebarItems.map(item => item.title));
     }
-  }, [profile?.email, isSalesAccount, filteredSidebarItems]);
+  }, [isLoading, isSalesAccount, filteredSidebarItems]);
 
   const toggleExpanded = (title: string) => {
     setExpandedItems(prev => 
