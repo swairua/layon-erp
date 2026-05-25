@@ -745,8 +745,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
-        return { error: new Error('Not authenticated') };
+        const errorMsg = 'Not authenticated. Please sign in again.';
+        setTimeout(() => toast.error(errorMsg), 0);
+        return { error: new Error(errorMsg) };
       }
+
+      console.log('📝 Attempting to change password for user:', userId);
 
       const { data, error } = await supabase.functions.invoke('change-user-password', {
         body: {
@@ -758,24 +762,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         },
       });
 
+      console.log('Response from edge function:', { data, error });
+
       if (error) {
-        logError('Error changing user password:', error, { context: 'changeUserPassword', targetUserId: userId });
-        const errorMessage = typeof error === 'string' ? error : (error as any)?.message || 'Failed to change password';
+        logError('Error changing user password:', error, { context: 'changeUserPassword', targetUserId: userId, errorDetails: String(error) });
+        let errorMessage = formatErrorForDisplay(error);
+        if (!errorMessage || errorMessage === 'An unexpected error occurred') {
+          errorMessage = 'Failed to send request to edge function. Please try again.';
+        }
         setTimeout(() => toast.error(`Failed to change password: ${errorMessage}`), 0);
         return { error: new Error(errorMessage) };
       }
 
       if (data?.success) {
+        console.log('✅ Password changed successfully');
         setTimeout(() => toast.success('Password changed successfully'), 0);
         return { error: null };
       } else {
         const errorMsg = data?.error || 'Failed to change password';
+        console.log('❌ Password change failed:', errorMsg);
         setTimeout(() => toast.error(errorMsg), 0);
         return { error: new Error(errorMsg) };
       }
     } catch (error) {
       logError('Error changing user password exception:', error, { context: 'changeUserPassword', targetUserId: userId });
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      console.error('💥 Unexpected error:', errorMessage);
       setTimeout(() => toast.error(`Failed to change password: ${errorMessage}`), 0);
       return { error: error as Error };
     }
