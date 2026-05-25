@@ -57,11 +57,11 @@ const Index = () => {
         </p>
       </div>
 
-      {/* Dashboard Stats */}
-      {!isSalesAccount && <DashboardStats />}
+      {/* Dashboard Stats - only show when profile is loaded and not a sales account */}
+      {!isLoading && !isSalesAccount && <DashboardStats />}
 
-      {/* Dashboard Summary Cards with Drill-down */}
-      {!isSalesAccount && <DashboardSummaryCards onDrill={handleDrillDown} />}
+      {/* Dashboard Summary Cards with Drill-down - only show when profile is loaded and not a sales account */}
+      {!isLoading && !isSalesAccount && <DashboardSummaryCards onDrill={handleDrillDown} />}
 
       {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-3">

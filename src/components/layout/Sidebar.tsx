@@ -103,6 +103,10 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }:
 
   // Filter sidebar items based on user role
   const filteredSidebarItems = useMemo(() => {
+    // If profile is still loading, show all items to avoid flashing
+    if (isLoading) {
+      return sidebarItems;
+    }
     return sidebarItems.filter(item => {
       // Hide these items for sales accounts
       if (isSalesAccount && ['Payments', 'Audit Logs', 'Settings'].includes(item.title)) {
@@ -110,7 +114,7 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }:
       }
       return true;
     });
-  }, [isSalesAccount]);
+  }, [isSalesAccount, isLoading]);
 
   useEffect(() => {
     if (!isLoading) {
