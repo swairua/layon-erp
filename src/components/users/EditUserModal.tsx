@@ -7,6 +7,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,8 +27,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, User, Phone, Building, MapPin } from 'lucide-react';
-import { UserProfile, UserRole, UserStatus } from '@/contexts/AuthContext';
+import { Loader2, User, Phone, Building, MapPin, Lock } from 'lucide-react';
+import { UserProfile, UserRole, UserStatus, useAuth } from '@/contexts/AuthContext';
 import { UpdateUserData } from '@/hooks/useUserManagement';
 
 interface EditUserModalProps {
@@ -36,6 +46,7 @@ export function EditUserModal({
   onUpdateUser,
   loading = false,
 }: EditUserModalProps) {
+  const { changeUserPassword } = useAuth();
   const [formData, setFormData] = useState<UpdateUserData>({
     full_name: '',
     role: 'user',
@@ -44,7 +55,11 @@ export function EditUserModal({
     department: '',
     position: '',
   });
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // Update form data when user changes
   useEffect(() => {
@@ -57,8 +72,10 @@ export function EditUserModal({
         department: user.department || '',
         position: user.position || '',
       });
+      setNewPassword('');
+      setPasswordError('');
     }
-  }, [user]);
+  }, [user, open]);
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
@@ -86,10 +103,50 @@ export function EditUserModal({
       return;
     }
 
+    // If there's a new password, show confirmation dialog
+    if (newPassword.trim()) {
+      setShowPasswordConfirm(true);
+      return;
+    }
+
+    // Otherwise just update the user profile
     const result = await onUpdateUser(user.id, formData);
-    
+
     if (result.success) {
       handleClose();
+    }
+  };
+
+  const handlePasswordConfirm = async () => {
+    if (!user || !newPassword.trim()) {
+      return;
+    }
+
+    // Validate password
+    if (newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters');
+      return;
+    }
+
+    setIsChangingPassword(true);
+
+    try {
+      // First update the profile
+      const profileResult = await onUpdateUser(user.id, formData);
+
+      if (!profileResult.success) {
+        return;
+      }
+
+      // Then change the password
+      const passwordResult = await changeUserPassword(user.id, newPassword);
+
+      if (!passwordResult.error) {
+        setShowPasswordConfirm(false);
+        handleClose();
+      }
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -270,17 +327,44 @@ export function EditUserModal({
             </div>
           </div>
 
+          <div className="border-t pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="new_password">Change Password (Optional)</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="new_password"
+                  type="password"
+                  placeholder="Leave blank to keep current password"
+                  value={newPassword}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value);
+                    if (passwordError) setPasswordError('');
+                  }}
+                  className={`pl-10 ${passwordError ? 'border-destructive' : ''}`}
+                  disabled={loading || isChangingPassword}
+                />
+              </div>
+              {passwordError && (
+                <p className="text-sm text-destructive">{passwordError}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Set a temporary password for the user to use on first login. Minimum 6 characters.
+              </p>
+            </div>
+          </div>
+
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
               onClick={handleClose}
-              disabled={loading}
+              disabled={loading || isChangingPassword}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? (
+            <Button type="submit" disabled={loading || isChangingPassword}>
+              {loading || isChangingPassword ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Updating...
@@ -291,6 +375,40 @@ export function EditUserModal({
             </Button>
           </DialogFooter>
         </form>
+
+        <AlertDialog open={showPasswordConfirm} onOpenChange={setShowPasswordConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Change User Password</AlertDialogTitle>
+              <AlertDialogDescription>
+                You are about to change the password for {user?.full_name || user?.email}.
+                They will need to use the new password on their next login.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-900">
+              ⚠️ New temporary password: <span className="font-mono font-semibold">{newPassword}</span>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isChangingPassword}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handlePasswordConfirm}
+                disabled={isChangingPassword}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {isChangingPassword ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Changing...
+                  </>
+                ) : (
+                  'Confirm & Update'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );

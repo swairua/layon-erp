@@ -64,6 +64,7 @@ export interface AuthContextType {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ error: Error | null }>;
+  changeUserPassword: (userId: string, newPassword: string) => Promise<{ error: Error | null }>;
   isAuthenticated: boolean;
   isAdmin: boolean;
   refreshProfile: () => Promise<void>;
@@ -739,6 +740,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [user, fetchProfile]);
 
+  const changeUserPassword = useCallback(async (userId: string, newPassword: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        return { error: new Error('Not authenticated') };
+      }
+
+      const { data, error } = await supabase.functions.invoke('change-user-password', {
+        body: {
+          userId,
+          newPassword,
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) {
+        logError('Error changing user password:', error, { context: 'changeUserPassword', targetUserId: userId });
+        const errorMessage = typeof error === 'string' ? error : (error as any)?.message || 'Failed to change password';
+        setTimeout(() => toast.error(`Failed to change password: ${errorMessage}`), 0);
+        return { error: new Error(errorMessage) };
+      }
+
+      if (data?.success) {
+        setTimeout(() => toast.success('Password changed successfully'), 0);
+        return { error: null };
+      } else {
+        const errorMsg = data?.error || 'Failed to change password';
+        setTimeout(() => toast.error(errorMsg), 0);
+        return { error: new Error(errorMsg) };
+      }
+    } catch (error) {
+      logError('Error changing user password exception:', error, { context: 'changeUserPassword', targetUserId: userId });
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      setTimeout(() => toast.error(`Failed to change password: ${errorMessage}`), 0);
+      return { error: error as Error };
+    }
+  }, []);
+
   // Add function to manually clear tokens
   const clearTokens = useCallback(() => {
     clearAuthTokens();
@@ -762,6 +804,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signOut,
     resetPassword,
     updateProfile,
+    changeUserPassword,
     isAuthenticated,
     isAdmin,
     refreshProfile,
