@@ -121,6 +121,8 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingClose, setPendingClose] = useState(false);
   const [editSaveError, setEditSaveError] = useState<string | null>(null);
+  const [isHydrating, setIsHydrating] = useState(true);
+  const [hydrationError, setHydrationError] = useState<string | null>(null);
   const unsavedChangesRef = useRef(false);
   const pendingChangesRef = useRef<any>({});
 
@@ -278,120 +280,118 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
 
   useEffect(() => {
     if (open && boq && profile?.id && currentCompany?.id) {
-      // Check if there's an edit draft for this BOQ
+      setIsHydrating(true);
+      setHydrationError(null);
+
       const checkAndLoadDraft = async () => {
-        console.log('[EditBOQModal] Loading BOQ:', { id: boq.id, number: boq.number, hasData: !!boq.data });
+        try {
+          console.log('[EditBOQModal] Loading BOQ:', { id: boq.id, number: boq.number, hasData: !!boq.data });
 
-        const editDraft = await loadEditDraft(profile.id, currentCompany.id, boq.id);
-        console.log('[EditBOQModal] Edit draft found:', !!editDraft);
+          const editDraft = await loadEditDraft(profile.id, currentCompany.id, boq.id);
+          console.log('[EditBOQModal] Edit draft found:', !!editDraft);
 
-        // Load from draft if it exists and is newer than published version
-        let dataToUse = boq;
-        if (editDraft) {
-          try {
-            const draftUpdated = new Date(editDraft.updated_at);
-            const boqUpdated = new Date(boq.updated_at);
-            if (draftUpdated > boqUpdated) {
-              dataToUse = editDraft;
+          // Load from draft if it exists and is newer than published version
+          let dataToUse = boq;
+          if (editDraft) {
+            try {
+              const draftUpdated = new Date(editDraft.updated_at);
+              const boqUpdated = new Date(boq.updated_at);
+              if (draftUpdated > boqUpdated) {
+                dataToUse = editDraft;
+              }
+            } catch (err) {
+              console.error('[EditBOQModal] Error comparing dates:', err);
             }
-          } catch (err) {
-            console.error('[EditBOQModal] Error comparing dates:', err);
-            // Fall back to using boq if date comparison fails
           }
-        }
 
-        console.log('[EditBOQModal] Using data from:', dataToUse.id === editDraft?.id ? 'draft' : 'boq');
+          console.log('[EditBOQModal] Using data from:', dataToUse.id === editDraft?.id ? 'draft' : 'boq');
 
-        // Safely extract boq data with fallbacks
-        const boqData = dataToUse.data || {};
+          const boqData = dataToUse.data || {};
 
-        // Set basic fields from dataToUse (top-level fields)
-        const boqNum = dataToUse.number || '';
-        const boqDateVal = dataToUse.boq_date || '';
-        const dueDateVal = dataToUse.due_date || '';
+          const boqNum = dataToUse.number || '';
+          const boqDateVal = dataToUse.boq_date || '';
+          const dueDateVal = dataToUse.due_date || '';
 
-        setBoqNumber(boqNum);
-        setBoqDate(boqDateVal);
-        setDueDate(dueDateVal);
+          setBoqNumber(boqNum);
+          setBoqDate(boqDateVal);
+          setDueDate(dueDateVal);
 
-        // Set fields that may be in data object or top-level
-        setProjectTitle(dataToUse.project_title || boqData.project_title || '');
-        setContractor(dataToUse.contractor || boqData.contractor || '');
-        setNotes(boqData.notes || '');
+          setProjectTitle(dataToUse.project_title || boqData.project_title || '');
+          setContractor(dataToUse.contractor || boqData.contractor || '');
+          setNotes(boqData.notes || '');
 
-        const termsToUse = dataToUse.terms_and_conditions || '';
-        setTermsAndConditions(termsToUse);
-        const showCalcValues = dataToUse.show_calculated_values_in_terms || false;
-        setShowCalculatedValuesInTerms(showCalcValues);
+          const termsToUse = dataToUse.terms_and_conditions || '';
+          setTermsAndConditions(termsToUse);
+          const showCalcValues = dataToUse.show_calculated_values_in_terms || false;
+          setShowCalculatedValuesInTerms(showCalcValues);
 
-        // Currency can be in data or top-level
-        const currencyToUse = dataToUse.currency || boqData.currency || 'KES';
-        setCurrency(currencyToUse);
+          const currencyToUse = dataToUse.currency || boqData.currency || 'KES';
+          setCurrency(currencyToUse);
 
-        // Set client ID from client_name - with null check
-        const clientName = dataToUse.client_name || boqData.client_name;
-        const clientIdFromBoq = clientName ? customers.find(c => c.name === clientName)?.id : undefined;
-        if (clientIdFromBoq) {
-          setClientId(clientIdFromBoq);
-        }
+          const clientName = dataToUse.client_name || boqData.client_name;
+          const clientIdFromBoq = clientName ? customers.find(c => c.name === clientName)?.id : undefined;
+          if (clientIdFromBoq) {
+            setClientId(clientIdFromBoq);
+          }
 
-        // Load sections with proper fallback and validation
-        const sections = boqData.sections;
-        if (sections && Array.isArray(sections) && sections.length > 0) {
-          try {
-            const loadedSections: BOQSectionRow[] = sections.map((section: any) => {
-              // Ensure subsections is an array
-              const subsectionsArray = Array.isArray(section.subsections) ? section.subsections : [];
+          const sections = boqData.sections;
+          if (sections && Array.isArray(sections) && sections.length > 0) {
+            try {
+              const loadedSections: BOQSectionRow[] = sections.map((section: any) => {
+                const subsectionsArray = Array.isArray(section.subsections) ? section.subsections : [];
 
-              return {
-                id: `section-${generateSafeUUID()}`,
-                title: section.title || 'General',
-                subsections: subsectionsArray.map((subsection: any) => {
-                  // Ensure items is an array
-                  const itemsArray = Array.isArray(subsection.items) ? subsection.items : [];
+                return {
+                  id: `section-${generateSafeUUID()}`,
+                  title: section.title || 'General',
+                  subsections: subsectionsArray.map((subsection: any) => {
+                    const itemsArray = Array.isArray(subsection.items) ? subsection.items : [];
 
-                  return {
-                    id: `subsection-${generateSafeUUID()}`,
-                    name: subsection.name || '',
-                    label: subsection.label || '',
-                    items: itemsArray.map((item: any) => ({
-                      id: `item-${generateSafeUUID()}`,
-                      description: item.description || '',
-                      quantity: Number(item.quantity) || 1,
-                      unit: item.unit_id || '',
-                      rate: Number(item.rate) || 0,
-                    })),
-                  };
-                }),
-              };
-            });
-            setSections(loadedSections);
-          } catch (err) {
-            console.error('Error loading sections:', err);
+                    return {
+                      id: `subsection-${generateSafeUUID()}`,
+                      name: subsection.name || '',
+                      label: subsection.label || '',
+                      items: itemsArray.map((item: any) => ({
+                        id: `item-${generateSafeUUID()}`,
+                        description: item.description || '',
+                        quantity: Number(item.quantity) || 1,
+                        unit: item.unit_id || '',
+                        rate: Number(item.rate) || 0,
+                      })),
+                    };
+                  }),
+                };
+              });
+              setSections(loadedSections);
+            } catch (err) {
+              console.error('Error loading sections:', err);
+              setSections([defaultSection()]);
+            }
+          } else {
             setSections([defaultSection()]);
           }
-        } else {
-          // No sections found, use default
-          setSections([defaultSection()]);
-        }
 
-        // Set last saved time if we loaded a draft
-        if (editDraft) {
-          setLastSavedTime(editDraft.last_autosaved_at);
-        }
+          if (editDraft) {
+            setLastSavedTime(editDraft.last_autosaved_at);
+          }
 
-        // Log warning if critical data is missing
-        if (!boqNum || !boqDateVal || !clientIdFromBoq) {
-          console.warn('[EditBOQModal] Missing critical BOQ data:', {
-            boqNumber: boqNum || 'MISSING',
-            boqDate: boqDateVal || 'MISSING',
-            clientId: clientIdFromBoq || 'MISSING',
-            clientName: clientName,
-          });
-        }
+          if (!boqNum || !boqDateVal || !clientIdFromBoq) {
+            console.warn('[EditBOQModal] Missing critical BOQ data:', {
+              boqNumber: boqNum || 'MISSING',
+              boqDate: boqDateVal || 'MISSING',
+              clientId: clientIdFromBoq || 'MISSING',
+              clientName: clientName,
+            });
+          }
 
-        setHasUnsavedChanges(false);
-        unsavedChangesRef.current = false;
+          setHasUnsavedChanges(false);
+          unsavedChangesRef.current = false;
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : 'Failed to load BOQ details';
+          console.error('[EditBOQModal] Hydration error:', err);
+          setHydrationError(errorMsg);
+        } finally {
+          setIsHydrating(false);
+        }
       };
 
       checkAndLoadDraft();
@@ -660,23 +660,60 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
           </DialogDescription>
         </DialogHeader>
 
+        {isHydrating && (
+          <div className="flex flex-col items-center justify-center py-12 space-y-4">
+            <div className="w-full space-y-3">
+              <div className="h-10 bg-muted rounded animate-pulse" />
+              <div className="grid grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="h-10 bg-muted rounded animate-pulse" />
+                ))}
+              </div>
+              <div className="h-10 bg-muted rounded animate-pulse" />
+              <div className="grid grid-cols-2 gap-4">
+                {[1, 2].map(i => (
+                  <div key={i} className="h-10 bg-muted rounded animate-pulse" />
+                ))}
+              </div>
+              <div className="h-64 bg-muted rounded animate-pulse" />
+            </div>
+            <p className="text-sm text-muted-foreground">Loading BOQ details...</p>
+          </div>
+        )}
+
+        {hydrationError && (
+          <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+            <p className="text-sm font-medium text-destructive">Failed to load BOQ details</p>
+            <p className="text-sm text-destructive/80 mt-1">{hydrationError}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              className="mt-3"
+            >
+              Close
+            </Button>
+          </div>
+        )}
+
+        {!isHydrating && !hydrationError && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <Label>BOQ Number</Label>
-              <Input value={boqNumber} onChange={e => { setBoqNumber(e.target.value); triggerAutosave(); }} />
+              <Input value={boqNumber} onChange={e => { setBoqNumber(e.target.value); triggerAutosave(); }} disabled={isHydrating} />
             </div>
             <div>
               <Label>Date</Label>
-              <Input type="date" value={boqDate} onChange={e => { setBoqDate(e.target.value); triggerAutosave(); }} />
+              <Input type="date" value={boqDate} onChange={e => { setBoqDate(e.target.value); triggerAutosave(); }} disabled={isHydrating} />
             </div>
             <div>
               <Label>Due Date</Label>
-              <Input type="date" value={dueDate} onChange={e => { setDueDate(e.target.value); triggerAutosave(); }} />
+              <Input type="date" value={dueDate} onChange={e => { setDueDate(e.target.value); triggerAutosave(); }} disabled={isHydrating} />
             </div>
             <div>
               <Label>Currency</Label>
-              <Select value={currency} onValueChange={val => { setCurrency(val); triggerAutosave(); }}>
+              <Select value={currency} onValueChange={val => { setCurrency(val); triggerAutosave(); }} disabled={isHydrating}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
@@ -692,7 +729,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
 
           <div>
             <Label>Client</Label>
-            <Select value={clientId} onValueChange={val => { setClientId(val); triggerAutosave(); }}>
+            <Select value={clientId} onValueChange={val => { setClientId(val); triggerAutosave(); }} disabled={isHydrating}>
               <SelectTrigger>
                 <SelectValue placeholder="Select client" />
               </SelectTrigger>
@@ -890,7 +927,9 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
             </div>
           </div>
         </div>
+        )}
 
+        {!isHydrating && !hydrationError && (
         <DialogFooter className="mt-6 flex items-center justify-between">
           <BOQSaveIndicator
             isSaving={isSaving}
@@ -905,13 +944,14 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
               } else {
                 onOpenChange(false);
               }
-            }}>Cancel</Button>
-            <Button onClick={handleSave} disabled={submitting}>
+            }} disabled={isHydrating}>Cancel</Button>
+            <Button onClick={handleSave} disabled={submitting || isHydrating}>
               <Calculator className="h-4 w-4 mr-2" />
               {submitting ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>
         </DialogFooter>
+        )}
 
         <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
           <AlertDialogContent>

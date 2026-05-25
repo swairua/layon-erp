@@ -100,7 +100,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
   const currentCompany = companies?.[0];
   const { data: customers = [] } = useCustomers(currentCompany?.id);
   const { data: units = [] } = useUnits(currentCompany?.id);
-  const { data: existingBOQs = [] } = useBOQs(currentCompany?.id);
+  const { data: existingBOQs = [] } = useBOQs(currentCompany?.id, 'id, number');
   const { profile } = useAuth();
 
   const [unitModalOpen, setUnitModalOpen] = useState(false);
@@ -112,6 +112,8 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
   const [saveError, setSaveError] = useState<string | null>(null);
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [authReadyError, setAuthReadyError] = useState<string | null>(null);
+  const [isHydrating, setIsHydrating] = useState(true);
+  const [hydrationError, setHydrationError] = useState<string | null>(null);
 
   const pendingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingFormDataRef = useRef<any>(null);
@@ -144,6 +146,14 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
       setDueDate(todayISO);
     }
   }, [open, defaultNumber, todayISO]);
+
+  // Set hydration state based on modal opening
+  useEffect(() => {
+    if (open) {
+      setIsHydrating(true);
+      setHydrationError(null);
+    }
+  }, [open]);
 
   // Load company default terms when modal opens
   useEffect(() => {
@@ -181,11 +191,17 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
           }
         } catch (err) {
           console.log('Failed to load draft:', err);
+          setHydrationError('Failed to load draft');
+        } finally {
+          setDraftLoaded(true);
+          setIsHydrating(false);
         }
-        setDraftLoaded(true);
       };
 
       loadDraft();
+    } else if (open && previousTermsLoaded && !draftLoaded) {
+      setDraftLoaded(true);
+      setIsHydrating(false);
     }
   }, [open, previousTermsLoaded, draftLoaded, currentCompany?.id, profile?.id]);
 
@@ -646,6 +662,43 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
           </DialogDescription>
         </DialogHeader>
 
+        {isHydrating && (
+          <div className="flex flex-col items-center justify-center py-12 space-y-4">
+            <div className="w-full space-y-3">
+              <div className="h-10 bg-muted rounded animate-pulse" />
+              <div className="grid grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="h-10 bg-muted rounded animate-pulse" />
+                ))}
+              </div>
+              <div className="h-10 bg-muted rounded animate-pulse" />
+              <div className="grid grid-cols-2 gap-4">
+                {[1, 2].map(i => (
+                  <div key={i} className="h-10 bg-muted rounded animate-pulse" />
+                ))}
+              </div>
+              <div className="h-64 bg-muted rounded animate-pulse" />
+            </div>
+            <p className="text-sm text-muted-foreground">Loading form...</p>
+          </div>
+        )}
+
+        {hydrationError && (
+          <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+            <p className="text-sm font-medium text-destructive">Failed to load form</p>
+            <p className="text-sm text-destructive/80 mt-1">{hydrationError}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleOpenChange(false)}
+              className="mt-3"
+            >
+              Close
+            </Button>
+          </div>
+        )}
+
+        {!isHydrating && !hydrationError && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             <div>
@@ -876,7 +929,9 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
             </div>
           </div>
         </div>
+        )}
 
+        {!isHydrating && !hydrationError && (
         <DialogFooter className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
           <Button variant="destructive" onClick={handleClearForm} className="w-full sm:w-auto">
             Clear Form
@@ -889,6 +944,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
             </Button>
           </div>
         </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -311,18 +311,15 @@ export const useUpdateCompany = () => {
 export const useCustomers = (companyId?: string) => {
   return useQuery({
     queryKey: ['customers', companyId],
+    enabled: !!companyId,
     queryFn: async () => {
-      let query = supabase
+      if (!companyId) return [];
+      const { data, error } = await supabase
         .from('customers')
         .select('*')
+        .eq('company_id', companyId)
         .order('created_at', { ascending: false });
-      
-      if (companyId) {
-        query = query.eq('company_id', companyId);
-      }
-      
-      const { data, error } = await query;
-      
+
       if (error) throw error;
       return data as Customer[];
     },
@@ -559,15 +556,15 @@ export const useDeleteTaxSetting = () => {
 };
 
 // BOQs hooks
-export const useBOQs = (companyId?: string) => {
+export const useBOQs = (companyId?: string, selectFields?: string) => {
   return useQuery({
-    queryKey: ['boqs', companyId],
+    queryKey: ['boqs', companyId, selectFields],
     enabled: !!companyId,
     queryFn: async () => {
       if (!companyId) return [];
       const { data, error } = await supabase
         .from('boqs')
-        .select('*')
+        .select(selectFields || '*')
         .eq('company_id', companyId)
         .order('created_at', { ascending: false });
       if (error) throw error;

@@ -366,6 +366,7 @@ export async function loadEditDraft(
 ): Promise<BOQDraftRecord | null> {
   try {
     if (!userId || !companyId || !boqId) {
+      console.warn('[loadEditDraft] Missing required parameters', { userId: !!userId, companyId: !!companyId, boqId: !!boqId });
       return null;
     }
 
@@ -380,16 +381,18 @@ export async function loadEditDraft(
     if (error) {
       if (error.code === 'PGRST116') {
         // No rows found - expected when no draft exists
+        console.log('[loadEditDraft] No draft found for BOQ:', boqId);
         return null;
       }
-      console.error('Failed to load edit draft:', error);
+      console.error('[loadEditDraft] Query error:', { code: error.code, message: error.message });
       return null;
     }
 
+    console.log('[loadEditDraft] Successfully loaded draft for BOQ:', boqId);
     return data as BOQDraftRecord;
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-    console.error('Error loading edit draft:', errorMsg);
+    console.error('[loadEditDraft] Unexpected error:', errorMsg);
     return null;
   }
 }
