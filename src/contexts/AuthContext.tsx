@@ -661,79 +661,100 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const session = (data as any)?.data?.session;
       const signedInUser = session?.user;
       if (signedInUser) {
+        console.log('📝 Setting session and user state after sign in');
         setSession(session);
         setUser(signedInUser);
 
-        // Fetch profile with timeout before clearing loading state
-        // This ensures components render with correct role/email filtering
-        const profileTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
-          setTimeout(() => {
-            console.warn('⏱️ Profile fetch timeout during sign in (5s)');
-            resolve(null);
-          }, 5000); // 5 second timeout for sign in flow
-        });
+        try {
+          // Fetch profile with timeout before clearing loading state
+          // This ensures components render with correct role/email filtering
+          const profileTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
+            setTimeout(() => {
+              console.warn('⏱️ Profile fetch timeout during sign in (5s)');
+              resolve(null);
+            }, 5000); // 5 second timeout for sign in flow
+          });
 
-        const userProfile = await Promise.race([
-          fetchProfile(signedInUser.id),
-          profileTimeoutPromise
-        ]);
+          console.log('🔍 Starting profile fetch with 5s timeout...');
+          const userProfile = await Promise.race([
+            fetchProfile(signedInUser.id),
+            profileTimeoutPromise
+          ]);
 
-        if (mountedRef.current) {
-          if (userProfile) {
-            if (userProfile.email) {
-              userProfile.email = userProfile.email.toLowerCase();
+          if (mountedRef.current) {
+            if (userProfile) {
+              if (userProfile.email) {
+                userProfile.email = userProfile.email.toLowerCase();
+              }
+              setProfile(userProfile);
+              console.log('✅ Profile loaded successfully during sign in');
+            } else {
+              // Create minimal profile as fallback to allow app to function
+              const fallbackProfile: UserProfile = {
+                id: signedInUser.id,
+                email: (signedInUser.email || '').toLowerCase(),
+                role: 'user',
+                status: 'active',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+              setProfile(fallbackProfile);
+              console.warn('⚠️ Profile fetch returned null, using fallback profile');
             }
-            setProfile(userProfile);
-            console.log('✅ Profile loaded successfully during sign in');
-          } else {
-            // Create minimal profile as fallback to allow app to function
-            const fallbackProfile: UserProfile = {
-              id: signedInUser.id,
-              email: (signedInUser.email || '').toLowerCase(),
-              role: 'user',
-              status: 'active',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            };
-            setProfile(fallbackProfile);
-            console.warn('⚠️ Profile fetch timeout, using fallback profile');
-          }
 
-          // Now safe to clear loading state - profile is set
-          setLoading(false);
+            // Now safe to clear loading state - profile is set
+            console.log('✅ Clearing loading state after profile setup');
+            setLoading(false);
 
-          // Continue with background retry for profile if needed
-          if (!userProfile) {
-            console.log('🔄 Starting background profile retry...');
-            const retryTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
-              setTimeout(() => {
-                console.warn('⏱️ Profile retry timeout');
-                resolve(null);
-              }, 10000); // 10 second timeout for background retry
-            });
-
-            Promise.race([
-              fetchProfile(signedInUser.id),
-              retryTimeoutPromise
-            ])
-              .then(retryProfile => {
-                if (mountedRef.current && retryProfile) {
-                  setProfile(retryProfile);
-                  console.log('✅ Profile loaded on background retry');
-                }
-              })
-              .catch(retryError => {
-                logError('Profile retry failed:', retryError, {
-                  userId: signedInUser.id,
-                  context: 'signIn'
-                });
+            // Continue with background retry for profile if needed
+            if (!userProfile) {
+              console.log('🔄 Starting background profile retry...');
+              const retryTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
+                setTimeout(() => {
+                  console.warn('⏱️ Profile retry timeout');
+                  resolve(null);
+                }, 10000); // 10 second timeout for background retry
               });
+
+              Promise.race([
+                fetchProfile(signedInUser.id),
+                retryTimeoutPromise
+              ])
+                .then(retryProfile => {
+                  if (mountedRef.current && retryProfile) {
+                    setProfile(retryProfile);
+                    console.log('✅ Profile loaded on background retry');
+                  }
+                })
+                .catch(retryError => {
+                  logError('Profile retry failed:', retryError, {
+                    userId: signedInUser.id,
+                    context: 'signIn'
+                  });
+                });
+            }
           }
+        } catch (profileError) {
+          console.error('❌ Error during profile fetch in signIn:', profileError);
+          // Ensure we clear loading even if profile fetch fails
+          setLoading(false);
+          // Create minimal fallback profile
+          const fallbackProfile: UserProfile = {
+            id: signedInUser.id,
+            email: (signedInUser.email || '').toLowerCase(),
+            role: 'user',
+            status: 'active',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          setProfile(fallbackProfile);
         }
       } else {
+        console.warn('⚠️ No user returned from sign in');
         setLoading(false);
       }
-    } catch {
+    } catch (error) {
+      console.error('❌ Unexpected error in signIn:', error);
       setLoading(false);
     }
     setTimeout(() => toast.success('Signed in successfully'), 0);
