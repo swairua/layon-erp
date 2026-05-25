@@ -807,7 +807,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           errorMsg = error;
         } else if (error && typeof error === 'object') {
           const errObj = error as any;
-          errorMsg = errObj.message || errObj.error_description || JSON.stringify(error);
+          // Try common error object properties
+          if (errObj.message && typeof errObj.message === 'string') {
+            errorMsg = errObj.message;
+          } else if (errObj.error_description && typeof errObj.error_description === 'string') {
+            errorMsg = errObj.error_description;
+          } else if (errObj.status) {
+            errorMsg = `Network error (status ${errObj.status})`;
+          } else {
+            errorMsg = 'Network error during sign out';
+          }
         }
 
         logError('❌ Sign out error:', errorMsg, { context: 'signOut' });
@@ -818,7 +827,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setSession(null);
         clearAuthTokens();
 
-        setTimeout(() => toast.error(`Signed out locally (server error: ${errorMsg})`), 0);
+        // Network errors during sign out are non-critical since we clear local state anyway
+        setTimeout(() => toast.info('Signed out locally (connection issue)'), 0);
       } else {
         console.log('✅ Supabase sign out successful');
 
@@ -842,7 +852,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         errorMsg = error;
       } else if (error && typeof error === 'object') {
         const errObj = error as any;
-        errorMsg = errObj.message || errObj.error_description || String(error);
+        if (errObj.message && typeof errObj.message === 'string') {
+          errorMsg = errObj.message;
+        } else if (errObj.error_description && typeof errObj.error_description === 'string') {
+          errorMsg = errObj.error_description;
+        } else if (errObj.status) {
+          errorMsg = `Network error (status ${errObj.status})`;
+        } else {
+          errorMsg = 'Network error during sign out';
+        }
       }
 
       logError('❌ Sign out exception:', errorMsg, { context: 'signOut' });
@@ -853,8 +871,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setSession(null);
       clearAuthTokens();
 
-      // Don't block the user from continuing
-      setTimeout(() => toast.info('Signed out locally (connection error)'), 0);
+      // Network errors during sign out are not critical - we've already cleared local state
+      setTimeout(() => toast.info('Signed out locally (connection issue)'), 0);
     } finally {
       if (mountedRef.current) {
         setLoading(false);
