@@ -322,7 +322,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
 
           const termsToUse = dataToUse.terms_and_conditions || '';
           setTermsAndConditions(termsToUse);
-          const showCalcValues = dataToUse.show_calculated_values_in_terms || false;
+          const showCalcValues = dataToUse.showCalculatedValuesInTerms || false;
           setShowCalculatedValuesInTerms(showCalcValues);
 
           const currencyToUse = dataToUse.currency || boqData.currency || 'KES';
