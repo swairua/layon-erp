@@ -34,38 +34,62 @@ import {
   LCLSectionDef,
 } from '@/types/lclTemplate';
 
-// Default section structure (can be customized based on BOQ-085)
+// Default section structure based on BOQ-085 (PROPOSED RESIDENTIAL MAISONETTE)
 const DEFAULT_SECTIONS: LCLSectionDef[] = [
   {
-    id: 'labor',
-    name: 'Labor',
+    id: 'foundation',
+    name: 'Section A: Foundation',
     subsections: [
-      { id: 'skilled', name: 'Skilled Labor' },
-      { id: 'unskilled', name: 'Unskilled Labor' },
+      { id: 'foundation_materials', name: 'Materials' },
+      { id: 'foundation_labor', name: 'Labor' },
     ],
   },
   {
-    id: 'materials',
-    name: 'Materials',
+    id: 'ground_floor_walling',
+    name: 'Section B: Ground Floor Walling',
     subsections: [
-      { id: 'construction', name: 'Construction Materials' },
-      { id: 'finishing', name: 'Finishing Materials' },
+      { id: 'gfw_materials', name: 'Materials' },
+      { id: 'gfw_labor', name: 'Labor' },
     ],
   },
   {
-    id: 'equipment',
-    name: 'Equipment & Machinery',
+    id: 'ground_floor_slab',
+    name: 'Section C: Ground Floor Suspended Slab',
     subsections: [
-      { id: 'rental', name: 'Equipment Rental' },
-      { id: 'tools', name: 'Tools' },
+      { id: 'gfs_materials', name: 'Materials' },
+      { id: 'gfs_labor', name: 'Labor' },
     ],
   },
   {
-    id: 'logistics',
-    name: 'Logistics & Transport',
+    id: 'first_floor_walling',
+    name: 'Section D: First Floor Walling & Columns',
     subsections: [
-      { id: 'transport', name: 'Transport' },
-      { id: 'handling', name: 'Handling' },
+      { id: 'ffw_materials', name: 'Materials' },
+      { id: 'ffw_labor', name: 'Labor' },
+    ],
+  },
+  {
+    id: 'first_floor_slab',
+    name: 'Section E: First Floor Suspended Slab',
+    subsections: [
+      { id: 'ffs_materials', name: 'Materials' },
+      { id: 'ffs_labor', name: 'Labor' },
+    ],
+  },
+  {
+    id: 'second_floor_walling',
+    name: 'Section F: Second Floor Walling & Columns',
+    subsections: [
+      { id: 'sfw_materials', name: 'Materials' },
+      { id: 'sfw_labor', name: 'Labor' },
+    ],
+  },
+  {
+    id: 'second_floor_slab',
+    name: 'Section G: Second Floor Suspended Slab',
+    subsections: [
+      { id: 'sfs_materials', name: 'Materials' },
+      { id: 'sfs_labor', name: 'Labor' },
     ],
   },
 ];

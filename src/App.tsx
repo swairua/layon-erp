@@ -36,7 +36,6 @@ const RemittanceAdvice = lazy(() => import("./pages/RemittanceAdvice"));
 const LPOs = lazy(() => import("./pages/LPOs"));
 const BOQs = lazy(() => import("./pages/BOQs"));
 const FixedBOQ = lazy(() => import("./pages/FixedBOQ"));
-const FixedBOQHierarchical = lazy(() => import("./pages/FixedBOQHierarchical"));
 const LCLTemplate = lazy(() => import("./pages/LCLTemplate"));
 const CreditNotes = lazy(() => import("./pages/CreditNotes"));
 const CashReceipts = lazy(() => import("./pages/CashReceipts"));
@@ -417,14 +416,6 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <FixedBOQ />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/fixed-boq-hierarchical"
-            element={
-              <ProtectedRoute>
-                <FixedBOQHierarchical />
               </ProtectedRoute>
             }
           />
