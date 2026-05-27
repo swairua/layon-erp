@@ -95,7 +95,7 @@ export async function saveBoqDraft(
         notes: formData.notes,
       },
       terms_and_conditions: formData.termsAndConditions || null,
-      showCalculatedValuesInTerms: formData.showCalculatedValuesInTerms || false,
+      show_calculated_values_in_terms: formData.showCalculatedValuesInTerms || false,
       updated_at: new Date().toISOString(),
       last_autosaved_at: new Date().toISOString(),
     };
@@ -299,6 +299,7 @@ export async function publishDraft(
       attachment_url: null,
       data: draft.data,
       terms_and_conditions: draft.terms_and_conditions,
+      show_calculated_values_in_terms: draft.show_calculated_values_in_terms,
       created_by: createdByUserId || null,
     };
 
@@ -372,7 +373,7 @@ export async function saveEditingDraft(
       total_amount: boqData.total_amount || 0,
       data: boqData.data,
       terms_and_conditions: boqData.terms_and_conditions || null,
-      showCalculatedValuesInTerms: boqData.showCalculatedValuesInTerms || false,
+      show_calculated_values_in_terms: boqData.show_calculated_values_in_terms || false,
       updated_at: new Date().toISOString(),
       last_autosaved_at: new Date().toISOString(),
     };
