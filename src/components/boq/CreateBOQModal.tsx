@@ -32,7 +32,7 @@ import { downloadBOQPDF, BoqDocument } from '@/utils/boqPdfGenerator';
 import { generateNextBOQNumber } from '@/utils/boqNumberGenerator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { saveBoqDraft, loadBoqDraft, deleteDraft, isDraftStale } from '@/services/boqAutoSaveService';
+import { saveBoqDraft, loadBoqDraft, deleteDraft, isDraftStale, cleanupDuplicateDrafts } from '@/services/boqAutoSaveService';
 
 // Safe UUID generator that works in all environments
 const generateSafeUUID = (): string => {
@@ -179,7 +179,10 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
             // Check if draft is stale (>30 minutes old)
             if (isDraftStale(draft.last_autosaved_at, 30 * 60 * 1000)) {
               console.log('[CreateBOQModal] Draft is stale, deleting and starting fresh');
-              await deleteDraft(profile.id, currentCompany.id);
+              const deleteResult = await deleteDraft(profile.id, currentCompany.id);
+              if (!deleteResult.success) {
+                console.error('[CreateBOQModal] Failed to delete stale draft:', deleteResult.error);
+              }
               // Start with fresh form (no restoration)
             } else {
               // Draft is fresh, restore it
@@ -243,6 +246,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
       setIsSavingDraft(true);
       setSaveError(null);
       setAuthReadyError(null);
+
       const selectedCustomer = customers.find(c => c.id === formData.clientId);
       const result = await saveBoqDraft(profile.id, currentCompany.id, {
         boqNumber: formData.boqNumber,
@@ -569,10 +573,17 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
         created_by: profile?.id || null,
       };
 
-      const { error: insertError } = await supabase.from('boqs').insert([payload]);
+      const { data: insertedBOQ, error: insertError } = await supabase.from('boqs').insert([payload]).select('id');
       if (insertError) {
-        console.warn('Failed to store BOQ:', insertError);
-        toast.error('BOQ generated but failed to save to database');
+        console.error('Failed to store BOQ:', insertError);
+        toast.error('Failed to save BOQ to database');
+        return;
+      }
+
+      if (!insertedBOQ || insertedBOQ.length === 0) {
+        console.error('BOQ created but no ID returned');
+        toast.error('BOQ saved but no ID returned from database');
+        return;
       }
 
       await downloadBOQPDF(doc, currentCompany ? {
@@ -588,10 +599,16 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
       } : undefined);
 
       toast.success(`BOQ ${boqNumber} generated and saved`);
-      // Clear draft from database
+
+      // Clear draft from database after successful save
       if (profile?.id && currentCompany?.id) {
-        await deleteDraft(profile.id, currentCompany.id);
+        const deleteResult = await deleteDraft(profile.id, currentCompany.id);
+        if (!deleteResult.success) {
+          console.warn('Failed to delete draft after BOQ creation:', deleteResult.error);
+          toast.warning('BOQ created but draft cleanup failed — you may see it again next time');
+        }
       }
+
       onSuccess?.();
       handleOpenChange(false);
     } catch (err) {
@@ -629,11 +646,17 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
 
     // Clear draft from database
     if (profile?.id && currentCompany?.id) {
-      const result = await deleteDraft(profile.id, currentCompany.id);
-      if (result.success) {
+      const deleteResult = await deleteDraft(profile.id, currentCompany.id);
+
+      // Also clean up any duplicate drafts that may exist
+      if (deleteResult.success) {
+        const cleanupResult = await cleanupDuplicateDrafts(profile.id, currentCompany.id);
+        if (cleanupResult.deletedCount && cleanupResult.deletedCount > 0) {
+          console.log(`[handleClearForm] Cleaned up ${cleanupResult.deletedCount} duplicate drafts`);
+        }
         toast.success('Form cleared and draft reset');
       } else {
-        toast.error('Failed to clear draft');
+        toast.error('Failed to clear draft: ' + deleteResult.error);
       }
     } else {
       toast.success('Form cleared');
