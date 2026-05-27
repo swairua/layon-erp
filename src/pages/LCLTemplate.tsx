@@ -9,7 +9,7 @@ import { LCLTemplateEditor } from '@/components/lclTemplate/LCLTemplateEditor';
 import { lclTemplateService } from '@/services/lclTemplateService';
 import { LCLHierarchicalData } from '@/types/lclTemplate';
 import { lclBoqService, LCLBOQRecord } from '@/services/lclBoqService';
-import { generateNextLCLBOQNumber } from '@/utils/lclBoqNumberGenerator';
+import { generateNextBOQNumber } from '@/utils/boqNumberGenerator';
 import { downloadLCLBOQPDF } from '@/utils/lclBoqPdfGenerator';
 import {
   Select,
@@ -66,15 +66,14 @@ export default function LCLTemplate() {
         await lclTemplateService.getHierarchicalData(lclDefaultStructure.id);
       setHierarchicalData(data);
 
-      // Generate next BOQ number - with error handling for table that may not exist yet
+      // Generate next BOQ number - checks both boqs and lcl_boqs tables
       try {
-        const existingBoqs = await lclBoqService.getLCLBOQs(companyId);
-        const nextNumber = generateNextLCLBOQNumber(existingBoqs);
+        const nextNumber = await generateNextBOQNumber(undefined, companyId);
         setBoqNumber(nextNumber);
       } catch (boqError) {
-        // If lcl_boqs table doesn't exist yet, just use LCL-001
-        console.log('Note: lcl_boqs table not initialized, using default number');
-        setBoqNumber('LCL-001');
+        // If error fetching from DB, use default
+        console.log('Note: Error generating BOQ number, using default');
+        setBoqNumber('BOQ-001');
       }
     } catch (error) {
       console.error('Error loading LCL BOQ:', error);
@@ -173,12 +172,49 @@ export default function LCLTemplate() {
         status: 'saved',
       };
 
+      // Save to lcl_boqs table
       const saved = await lclBoqService.saveLCLBOQ(boqData);
       setLclBoqRecord(saved);
 
+      // Create or update corresponding BOQ record in boqs table
+      try {
+        const customerInfo = {
+          name: selectedCustomer.name,
+          email: selectedCustomer.email,
+          phone: selectedCustomer.phone,
+          address: selectedCustomer.address,
+          city: selectedCustomer.city,
+          country: selectedCustomer.country,
+        };
+
+        const boqRecord = await lclBoqService.createBOQFromLCLBOQ(saved, customerInfo);
+
+        // Store the boq_id in lcl_boqs to maintain the relationship
+        if (boqRecord?.id && boqRecord.id !== saved.boq_id) {
+          await lclBoqService.saveLCLBOQ({
+            ...saved,
+            boq_id: boqRecord.id,
+          });
+          // Update local state to reflect the boq_id
+          setLclBoqRecord({
+            ...saved,
+            boq_id: boqRecord.id,
+          });
+        }
+      } catch (boqCreateError) {
+        console.error('Warning: Failed to create corresponding BOQ record:', boqCreateError);
+        // Don't fail the save if BOQ creation fails, but warn the user
+        toast({
+          title: 'Partial Success',
+          description: 'LCL BOQ saved, but failed to create corresponding BOQ record. Please contact support.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       toast({
         title: 'Success',
-        description: 'LCL BOQ saved successfully.',
+        description: 'LCL BOQ and corresponding BOQ record saved successfully.',
       });
     } catch (error) {
       console.error('Error saving LCL BOQ:', error);

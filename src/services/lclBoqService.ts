@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { BOQData } from '@/utils/boqHelper';
 
 export interface LCLBOQRecord {
   id?: string;
@@ -13,6 +14,7 @@ export interface LCLBOQRecord {
   created_at?: string;
   updated_at?: string;
   created_by?: string;
+  boq_id?: string | null;
 }
 
 class LCLBOQService {
@@ -111,6 +113,115 @@ class LCLBOQService {
       ...boq,
       status: 'saved',
     });
+  }
+
+  /**
+   * Create a corresponding BOQ record from an LCL BOQ
+   * Uses upsert logic to handle re-saves (if same number exists, update it)
+   * Returns the created/updated BOQ with its ID so the relationship can be tracked
+   */
+  async createBOQFromLCLBOQ(
+    lclBoq: LCLBOQRecord,
+    customerData: { name?: string; email?: string; phone?: string; address?: string; city?: string; country?: string } | null,
+    createdBy?: string
+  ): Promise<BOQData> {
+    // Calculate totals from items_snapshot
+    const items = lclBoq.items_snapshot || [];
+    let subtotal = 0;
+    items.forEach((item: any) => {
+      const itemTotal = (item.qty || 0) * (item.rate || 0);
+      subtotal += itemTotal;
+    });
+
+    // Create hierarchical data structure for BOQ
+    const boqData = {
+      sections: [
+        {
+          title: 'Items',
+          subsections: [
+            {
+              name: 'A',
+              label: 'Items',
+              items: items.map((item: any) => ({
+                description: item.description,
+                quantity: item.qty || 0,
+                unit: item.unit || '',
+                rate: item.rate || 0,
+              })),
+            },
+          ],
+        },
+      ],
+    };
+
+    const boqRecord: Omit<BOQData, 'id'> = {
+      number: lclBoq.number,
+      company_id: lclBoq.company_id,
+      boq_date: lclBoq.boq_date || new Date().toISOString().split('T')[0],
+      project_title: lclBoq.project_title || '',
+      client_name: customerData?.name || '',
+      client_email: customerData?.email,
+      client_phone: customerData?.phone,
+      client_address: customerData?.address,
+      client_city: customerData?.city,
+      client_country: customerData?.country,
+      currency: 'KES',
+      subtotal,
+      tax_amount: 0,
+      total_amount: subtotal,
+      data: boqData,
+      created_by: createdBy,
+    };
+
+    // Check if BOQ already exists by boq_id (for updates)
+    if (lclBoq.boq_id) {
+      const { data, error } = await supabase
+        .from('boqs')
+        .update({
+          ...boqRecord,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', lclBoq.boq_id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as BOQData;
+    }
+
+    // Check if BOQ with this number already exists for this company
+    const { data: existingBoq } = await supabase
+      .from('boqs')
+      .select('id')
+      .eq('company_id', lclBoq.company_id)
+      .eq('number', lclBoq.number)
+      .single();
+
+    if (existingBoq) {
+      // Update existing BOQ (shouldn't happen if boq_id is set, but fallback)
+      const { data, error } = await supabase
+        .from('boqs')
+        .update({
+          ...boqRecord,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingBoq.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as BOQData;
+    } else {
+      // Insert new BOQ
+      const { data, error } = await supabase
+        .from('boqs')
+        .insert([boqRecord])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as BOQData;
+    }
   }
 }
 
