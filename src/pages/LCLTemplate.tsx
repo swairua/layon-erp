@@ -1,19 +1,43 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentCompany } from '@/contexts/CompanyContext';
+import { useCustomers } from '@/hooks/useDatabase';
 import { LCLTemplateEditor } from '@/components/lclTemplate/LCLTemplateEditor';
 import { lclTemplateService } from '@/services/lclTemplateService';
 import { LCLHierarchicalData } from '@/types/lclTemplate';
+import { lclBoqService, LCLBOQRecord } from '@/services/lclBoqService';
+import { generateNextLCLBOQNumber } from '@/utils/lclBoqNumberGenerator';
+import { downloadLCLBOQPDF } from '@/utils/lclBoqPdfGenerator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Download, Save } from 'lucide-react';
 
 export default function LCLTemplate() {
   const { currentCompany } = useCurrentCompany();
   const companyId = currentCompany?.id || '';
   const { toast } = useToast();
+  const { data: customers } = useCustomers(companyId);
 
   const [hierarchicalData, setHierarchicalData] =
     useState<LCLHierarchicalData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  // BOQ Header fields
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [projectTitle, setProjectTitle] = useState<string>('');
+  const [boqNumber, setBoqNumber] = useState<string>('');
+  const [boqDate, setBoqDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [lclBoqRecord, setLclBoqRecord] = useState<LCLBOQRecord | null>(null);
 
   const loadLCLBOQData = async () => {
     if (!companyId) return;
@@ -33,6 +57,7 @@ export default function LCLTemplate() {
             'LCL Default BOQ structure not found. Please contact support.',
           variant: 'destructive',
         });
+        setLoading(false);
         return;
       }
 
@@ -40,7 +65,19 @@ export default function LCLTemplate() {
       const data =
         await lclTemplateService.getHierarchicalData(lclDefaultStructure.id);
       setHierarchicalData(data);
+
+      // Generate next BOQ number - with error handling for table that may not exist yet
+      try {
+        const existingBoqs = await lclBoqService.getLCLBOQs(companyId);
+        const nextNumber = generateNextLCLBOQNumber(existingBoqs);
+        setBoqNumber(nextNumber);
+      } catch (boqError) {
+        // If lcl_boqs table doesn't exist yet, just use LCL-001
+        console.log('Note: lcl_boqs table not initialized, using default number');
+        setBoqNumber('LCL-001');
+      }
     } catch (error) {
+      console.error('Error loading LCL BOQ:', error);
       toast({
         title: 'Error',
         description:
@@ -82,6 +119,137 @@ export default function LCLTemplate() {
     }
   };
 
+  const handleSaveLCLBOQ = async () => {
+    if (!hierarchicalData || !companyId) return;
+
+    const selectedCustomer = customers?.find((c) => c.id === selectedCustomerId);
+    if (!selectedCustomerId || !selectedCustomer) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please select a customer.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!projectTitle.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please enter a project title.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Flatten items snapshot
+      const itemsSnapshot: any[] = [];
+      hierarchicalData.sections.forEach((section) => {
+        section.subsections.forEach((subsection) => {
+          subsection.items.forEach((item) => {
+            itemsSnapshot.push({
+              section_id: section.section_id,
+              subsection_id: subsection.subsection_id,
+              item_number: item.item_number,
+              description: item.description,
+              unit: item.unit,
+              qty: item.default_qty || 0,
+              rate: item.default_rate || 0,
+              amount: item.amount,
+            });
+          });
+        });
+      });
+
+      const boqData: LCLBOQRecord = {
+        id: lclBoqRecord?.id,
+        company_id: companyId,
+        number: boqNumber,
+        customer_id: selectedCustomerId,
+        project_title: projectTitle,
+        boq_date: boqDate,
+        items_snapshot: itemsSnapshot,
+        status: 'saved',
+      };
+
+      const saved = await lclBoqService.saveLCLBOQ(boqData);
+      setLclBoqRecord(saved);
+
+      toast({
+        title: 'Success',
+        description: 'LCL BOQ saved successfully.',
+      });
+    } catch (error) {
+      console.error('Error saving LCL BOQ:', error);
+      toast({
+        title: 'Error',
+        description:
+          error instanceof Error ? error.message : 'Failed to save LCL BOQ. Please ensure the database is properly configured.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!hierarchicalData || !companyId) return;
+
+    const selectedCustomer = customers?.find((c) => c.id === selectedCustomerId);
+    if (!selectedCustomer) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please select a customer.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!projectTitle.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please enter a project title.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setDownloading(true);
+    try {
+      await downloadLCLBOQPDF(
+        hierarchicalData,
+        boqNumber,
+        boqDate,
+        selectedCustomer.name,
+        projectTitle,
+        {
+          name: currentCompany?.name || '',
+          logo_url: currentCompany?.logo_url,
+          address: currentCompany?.address,
+          city: currentCompany?.city,
+          country: currentCompany?.country,
+          phone: currentCompany?.phone,
+          email: currentCompany?.email,
+        }
+      );
+
+      toast({
+        title: 'Success',
+        description: 'LCL BOQ PDF downloaded successfully.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description:
+          error instanceof Error ? error.message : 'Failed to download PDF',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   useEffect(() => {
     loadLCLBOQData();
   }, [companyId]);
@@ -109,6 +277,84 @@ export default function LCLTemplate() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">LCL BOQ</h1>
+      </div>
+
+      {/* BOQ Header Section */}
+      <div className="bg-card border border-border rounded-lg p-6 space-y-4">
+        <h2 className="text-lg font-semibold mb-4">BOQ Details</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Customer Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="customer">Customer</Label>
+            <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+              <SelectTrigger id="customer">
+                <SelectValue placeholder="Select a customer" />
+              </SelectTrigger>
+              <SelectContent>
+                {customers?.map((customer) => (
+                  <SelectItem key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Project Title */}
+          <div className="space-y-2">
+            <Label htmlFor="projectTitle">Project Title</Label>
+            <Input
+              id="projectTitle"
+              placeholder="e.g., Proposed Development - House Renovations"
+              value={projectTitle}
+              onChange={(e) => setProjectTitle(e.target.value)}
+            />
+          </div>
+
+          {/* BOQ Number (Read-only) */}
+          <div className="space-y-2">
+            <Label htmlFor="boqNumber">BOQ Number</Label>
+            <Input
+              id="boqNumber"
+              value={boqNumber}
+              disabled
+              className="bg-muted"
+            />
+          </div>
+
+          {/* BOQ Date */}
+          <div className="space-y-2">
+            <Label htmlFor="boqDate">BOQ Date</Label>
+            <Input
+              id="boqDate"
+              type="date"
+              value={boqDate}
+              onChange={(e) => setBoqDate(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 pt-2">
+          <Button
+            onClick={handleSaveLCLBOQ}
+            disabled={saving || !selectedCustomerId || !projectTitle.trim()}
+            className="gap-2"
+          >
+            <Save className="h-4 w-4" />
+            Save LCL BOQ
+          </Button>
+          <Button
+            onClick={handleDownloadPDF}
+            variant="outline"
+            disabled={downloading || !selectedCustomerId || !projectTitle.trim()}
+            className="gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Download PDF
+          </Button>
+        </div>
       </div>
 
       <LCLTemplateEditor
