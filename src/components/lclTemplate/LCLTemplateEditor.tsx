@@ -231,9 +231,9 @@ export function LCLTemplateEditor({
         )}
         <div className="text-right">
           <p className="text-sm font-medium">
-            Grand Total:{' '}
+            Grand Total (KES):{' '}
             <span className="text-lg font-bold">
-              {data.grand_total.toFixed(2)}
+              Ksh{data.grand_total.toFixed(2)}
             </span>
           </p>
         </div>
@@ -257,7 +257,7 @@ export function LCLTemplateEditor({
                 <h3 className="font-semibold">{section.section_name}</h3>
               </div>
               <p className="text-sm font-medium">
-                Section Total: {section.total.toFixed(2)}
+                Section Total (KES): Ksh{section.total.toFixed(2)}
               </p>
             </button>
 
@@ -284,7 +284,7 @@ export function LCLTemplateEditor({
                         </p>
                       </div>
                       <p className="text-sm">
-                        Subtotal: {subsection.subtotal.toFixed(2)}
+                        Subtotal (KES): Ksh{subsection.subtotal.toFixed(2)}
                       </p>
                     </button>
 
