@@ -37,7 +37,9 @@ export function ConfirmationDialog({
 }: ConfirmationDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={(isOpen) => {
-      if (!isOpen) onCancel();
+      if (!isOpen && onCancel && typeof onCancel === 'function') {
+        onCancel();
+      }
     }}>
       <AlertDialogContent>
         <AlertDialogHeader>
