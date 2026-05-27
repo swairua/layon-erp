@@ -30,10 +30,13 @@ function flattenLCLBOQItems(data: LCLHierarchicalData): Array<{
     _isSubtotal?: boolean;
   }> = [];
 
-  data.sections.forEach((section) => {
-    // Add section header
+  data.sections.forEach((section, sectionIndex) => {
+    // Generate section letter (A, B, C, etc.)
+    const sectionLetter = String.fromCharCode(65 + sectionIndex);
+
+    // Add section header with proper format for PDF renderer
     flatItems.push({
-      description: section.section_name,
+      description: `SECTION ${sectionLetter}: ${section.section_name}`,
       quantity: 0,
       unit_price: 0,
       line_total: 0,

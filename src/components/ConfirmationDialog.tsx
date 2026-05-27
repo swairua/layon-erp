@@ -15,7 +15,7 @@ interface ConfirmationDialogProps {
   title: string;
   description?: string;
   onConfirm: () => void | Promise<void>;
-  onCancel: () => void;
+  onCancel?: () => void;
   isLoading?: boolean;
   confirmText?: string;
   cancelText?: string;
@@ -37,7 +37,9 @@ export function ConfirmationDialog({
 }: ConfirmationDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={(isOpen) => {
-      if (!isOpen) onCancel();
+      if (!isOpen && typeof onCancel === 'function') {
+        onCancel();
+      }
     }}>
       <AlertDialogContent>
         <AlertDialogHeader>

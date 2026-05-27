@@ -286,12 +286,11 @@ export default function LCLBOQList() {
 
       <ConfirmationDialog
         open={showDeleteConfirm !== null}
-        onOpenChange={(open) => !open && setShowDeleteConfirm(null)}
+        onCancel={() => setShowDeleteConfirm(null)}
         title="Delete LCL BOQ"
         description="Are you sure you want to delete this LCL BOQ? This action cannot be undone."
         onConfirm={handleConfirmDelete}
         confirmText="Delete"
-        confirmVariant="destructive"
       />
     </div>
   );
