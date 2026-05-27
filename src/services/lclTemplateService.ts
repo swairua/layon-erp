@@ -147,11 +147,28 @@ export class LCLTemplateService {
       let section_total = 0;
 
       for (const subsectionDef of sectionDef.subsections) {
-        const subsectionItems = items.filter(
+        let subsectionItems = items.filter(
           (item) =>
             item.section_id === sectionDef.id &&
             item.subsection_id === subsectionDef.id
         );
+
+        // If this section has a parent and no items for this subsection,
+        // resolve from parent
+        if (subsectionItems.length === 0 && sectionDef.parent_section_id) {
+          const parentSectionId = sectionDef.parent_section_id;
+          // Map subsection ID to parent's equivalent (e.g., section_d_materials -> section_b_materials)
+          const parentSubsectionId = subsectionDef.id.replace(
+            new RegExp(`^${sectionDef.id}`),
+            parentSectionId
+          );
+
+          subsectionItems = items.filter(
+            (item) =>
+              item.section_id === parentSectionId &&
+              item.subsection_id === parentSubsectionId
+          );
+        }
 
         const itemsWithCalc: LCLItemWithCalculations[] = subsectionItems.map(
           (item) => ({

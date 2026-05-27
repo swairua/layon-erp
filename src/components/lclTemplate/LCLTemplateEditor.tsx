@@ -386,13 +386,30 @@ export function LCLTemplateEditor({
               onClick={() => toggleSection(section.section_id)}
               className="w-full flex items-center justify-between p-4 hover:bg-muted transition-colors"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 {expandedSections.has(section.section_id) ? (
                   <ChevronDown className="h-4 w-4" />
                 ) : (
                   <ChevronRight className="h-4 w-4" />
                 )}
                 <h3 className="font-semibold">{section.section_name}</h3>
+                {(() => {
+                  const inheritanceMap: { [key: string]: string } = {
+                    'section_d': 'section_b',
+                    'section_e': 'section_c',
+                    'section_f': 'section_b',
+                    'section_g': 'section_c'
+                  };
+                  const parentSectionId = inheritanceMap[section.section_id];
+                  const parentName = parentSectionId ?
+                    data.sections.find(s => s.section_id === parentSectionId)?.section_name :
+                    null;
+                  return parentName ? (
+                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                      Inherits from {parentName}
+                    </span>
+                  ) : null;
+                })()}
               </div>
               <p className="text-sm font-medium">
                 Section Total (KES): Ksh{totals[section.section_id]?.section.toLocaleString('en-KE', { maximumFractionDigits: 2 })}

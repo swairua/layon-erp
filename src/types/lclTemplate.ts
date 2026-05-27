@@ -12,6 +12,10 @@ export interface LCLTemplateStructure {
   updated_at: string;
 }
 
+export interface LCLSectionMetadata {
+  parent_section_id?: string; // Reference to inherited parent section
+}
+
 export interface LCLTemplateItem {
   id: string;
   company_id: string;
@@ -33,6 +37,7 @@ export interface LCLSectionDef {
   id: string;
   name: string;
   subsections: LCLSubsectionDef[];
+  parent_section_id?: string; // Section D/E/F/G can inherit from B/C
 }
 
 export interface LCLSubsectionDef {
