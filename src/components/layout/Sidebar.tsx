@@ -73,6 +73,11 @@ const sidebarItems: SidebarItem[] = [
     href: '/lcl-template'
   },
   {
+    title: 'LCL BOQ List',
+    icon: FileSpreadsheet,
+    href: '/lcl-boq-list'
+  },
+  {
     title: 'Payments',
     icon: DollarSign,
     children: [
