@@ -32,7 +32,7 @@ import { downloadBOQPDF, BoqDocument } from '@/utils/boqPdfGenerator';
 import { generateNextBOQNumber } from '@/utils/boqNumberGenerator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { saveBoqDraft, loadBoqDraft, deleteDraft } from '@/services/boqAutoSaveService';
+import { saveBoqDraft, loadBoqDraft, deleteDraft, isDraftStale } from '@/services/boqAutoSaveService';
 
 // Safe UUID generator that works in all environments
 const generateSafeUUID = (): string => {
@@ -176,18 +176,26 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
         try {
           const draft = await loadBoqDraft(profile.id, currentCompany.id);
           if (draft && draft.data) {
-            setBoqNumber(draft.number || defaultNumber);
-            setBoqDate(draft.boq_date || boqDate);
-            setDueDate(draft.due_date || dueDate);
-            setClientId(draft.customer_id || '');
-            setProjectTitle(draft.project_title || '');
-            setContractor(draft.contractor || '');
-            setNotes(draft.data?.notes || '');
-            setTermsAndConditions(draft.terms_and_conditions || termsAndConditions);
-            setShowCalculatedValuesInTerms(draft.show_calculated_values_in_terms || false);
-            setCurrency(draft.currency || currency);
-            setSections(draft.data?.sections || sections);
-            setLastAutosavedAt(draft.last_autosaved_at || null);
+            // Check if draft is stale (>30 minutes old)
+            if (isDraftStale(draft.last_autosaved_at, 30 * 60 * 1000)) {
+              console.log('[CreateBOQModal] Draft is stale, deleting and starting fresh');
+              await deleteDraft(profile.id, currentCompany.id);
+              // Start with fresh form (no restoration)
+            } else {
+              // Draft is fresh, restore it
+              setBoqNumber(draft.number || defaultNumber);
+              setBoqDate(draft.boq_date || boqDate);
+              setDueDate(draft.due_date || dueDate);
+              setClientId(draft.customer_id || '');
+              setProjectTitle(draft.project_title || '');
+              setContractor(draft.contractor || '');
+              setNotes(draft.data?.notes || '');
+              setTermsAndConditions(draft.terms_and_conditions || termsAndConditions);
+              setShowCalculatedValuesInTerms(draft.show_calculated_values_in_terms || false);
+              setCurrency(draft.currency || currency);
+              setSections(draft.data?.sections || sections);
+              setLastAutosavedAt(draft.last_autosaved_at || null);
+            }
           }
         } catch (err) {
           console.log('Failed to load draft:', err);

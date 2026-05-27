@@ -500,6 +500,33 @@ export async function deleteEditDraft(
 }
 
 /**
+ * Check if a draft is stale based on its last autosaved timestamp.
+ * A draft is considered stale if it hasn't been autosaved within the specified timeframe.
+ * @param lastAutosavedAt ISO timestamp string
+ * @param maxAgeMs Maximum age in milliseconds (default 30 minutes)
+ * @returns true if draft is stale, false if it's fresh
+ */
+export function isDraftStale(lastAutosavedAt: string | null, maxAgeMs: number = 30 * 60 * 1000): boolean {
+  if (!lastAutosavedAt) return true;
+
+  try {
+    const lastSavedTime = new Date(lastAutosavedAt).getTime();
+    const ageMs = Date.now() - lastSavedTime;
+    const isStale = ageMs > maxAgeMs;
+
+    if (isStale) {
+      const minutes = Math.floor(ageMs / 60000);
+      console.log(`[isDraftStale] Draft is stale: last saved ${minutes} minutes ago, threshold is ${maxAgeMs / 60000} minutes`);
+    }
+
+    return isStale;
+  } catch (err) {
+    console.error('[isDraftStale] Error parsing timestamp:', err);
+    return true; // Consider malformed timestamps as stale
+  }
+}
+
+/**
  * Check if a user has an unsaved draft for a company.
  * Returns true if draft exists (checks only create drafts with boq_id=NULL).
  */
