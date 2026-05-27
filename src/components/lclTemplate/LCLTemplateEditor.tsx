@@ -510,7 +510,7 @@ export function LCLTemplateEditor({
                                         })
                                       }
                                       disabled={loading}
-                                      className="h-10 text-right text-base"
+                                      className="h-10 text-right text-base md:text-base px-2 py-1"
                                       step="0.01"
                                     />
                                   ) : (
@@ -519,7 +519,7 @@ export function LCLTemplateEditor({
                                       value={inlineEdits[item.id]?.qty !== undefined ? inlineEdits[item.id].qty : item.default_qty || 0}
                                       onChange={(e) => handleInlineQtyChange(item.id, e.target.value)}
                                       disabled={loading}
-                                      className="h-10 text-right text-base"
+                                      className="h-10 text-right text-base md:text-base px-2 py-1"
                                       step="0.01"
                                     />
                                   )}
@@ -536,7 +536,7 @@ export function LCLTemplateEditor({
                                         })
                                       }
                                       disabled={loading}
-                                      className="h-10 text-right text-base"
+                                      className="h-10 text-right text-base md:text-base px-2 py-1"
                                       step="0.01"
                                     />
                                   ) : (
@@ -545,7 +545,7 @@ export function LCLTemplateEditor({
                                       value={inlineEdits[item.id]?.rate !== undefined ? inlineEdits[item.id].rate : item.default_rate || 0}
                                       onChange={(e) => handleInlineRateChange(item.id, e.target.value)}
                                       disabled={loading}
-                                      className="h-10 text-right text-base"
+                                      className="h-10 text-right text-base md:text-base px-2 py-1"
                                       step="0.01"
                                     />
                                   )}
@@ -662,7 +662,7 @@ export function LCLTemplateEditor({
                                       })
                                     }
                                     disabled={loading}
-                                    className="h-10 text-right text-base"
+                                    className="h-10 text-right text-base md:text-base px-2 py-1"
                                     placeholder="0.00"
                                     step="0.01"
                                   />
@@ -678,7 +678,7 @@ export function LCLTemplateEditor({
                                       })
                                     }
                                     disabled={loading}
-                                    className="h-10 text-right text-base"
+                                    className="h-10 text-right text-base md:text-base px-2 py-1"
                                     placeholder="0.00"
                                     step="0.01"
                                   />
