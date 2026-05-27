@@ -71,6 +71,11 @@ const sidebarItems: SidebarItem[] = [
     ]
   },
   {
+    title: 'LCL Template',
+    icon: FileSpreadsheet,
+    href: '/lcl-template'
+  },
+  {
     title: 'Payments',
     icon: DollarSign,
     children: [
