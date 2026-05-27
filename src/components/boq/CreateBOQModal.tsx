@@ -548,9 +548,22 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
         // This ensures single source of truth for terms_and_conditions and show_calculated_values_in_terms
       };
 
+      // Validate required fields before inserting
+      if (!currentCompany?.id) {
+        console.error('Company ID is missing');
+        toast.error('Company information is missing');
+        return;
+      }
+
+      if (!boqNumber) {
+        console.error('BOQ number is missing');
+        toast.error('BOQ number is required');
+        return;
+      }
+
       // Store BOQ in database
       const payload = {
-        company_id: currentCompany?.id || null,
+        company_id: currentCompany.id,
         number: boqNumber,
         boq_date: boqDate,
         due_date: dueDate,
@@ -573,10 +586,27 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
         created_by: profile?.id || null,
       };
 
+      console.log('[handleGenerate] Inserting BOQ with payload:', { number: payload.number, company_id: payload.company_id, total_amount: payload.total_amount });
+
       const { data: insertedBOQ, error: insertError } = await supabase.from('boqs').insert([payload]).select('id');
       if (insertError) {
-        console.error('Failed to store BOQ:', insertError);
-        toast.error('Failed to save BOQ to database');
+        // Extract error message from various error object formats
+        let errorMsg = 'Unknown error';
+        if (insertError instanceof Error) {
+          errorMsg = insertError.message;
+        } else if (typeof insertError === 'object' && insertError !== null) {
+          errorMsg = (insertError as any).message || (insertError as any).details || JSON.stringify(insertError);
+        }
+
+        console.error('Failed to store BOQ - Full error object:', insertError);
+        console.error('Failed to store BOQ - Error message:', errorMsg);
+        console.log('BOQ Payload that failed:', JSON.stringify(payload, null, 2));
+
+        if (errorMsg.includes('duplicate') || errorMsg.includes('unique')) {
+          toast.error(`BOQ number "${boqNumber}" already exists for this company`);
+        } else {
+          toast.error(`Failed to save BOQ: ${errorMsg}`);
+        }
         return;
       }
 
