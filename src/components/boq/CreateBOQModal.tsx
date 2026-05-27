@@ -630,7 +630,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
 
       toast.success(`BOQ ${boqNumber} generated and saved`);
 
-      // Clear draft from database after successful save
+      // Clear draft from database and reset form state after successful save
       if (profile?.id && currentCompany?.id) {
         const deleteResult = await deleteDraft(profile.id, currentCompany.id);
         if (!deleteResult.success) {
@@ -638,6 +638,13 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
           toast.warning('BOQ created but draft cleanup failed — you may see it again next time');
         }
       }
+
+      // Clear pending autosave and form state to prevent re-autosave on modal close
+      if (pendingTimeoutRef.current) {
+        clearTimeout(pendingTimeoutRef.current);
+        pendingTimeoutRef.current = null;
+      }
+      formStateRef.current = {};
 
       onSuccess?.();
       handleOpenChange(false);

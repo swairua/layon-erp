@@ -232,7 +232,7 @@ export async function deleteDraft(
       .delete()
       .eq('user_id', userId)
       .eq('company_id', companyId)
-      .eq('boq_id', null); // Only delete create drafts
+      .is('boq_id', null); // Only delete create drafts (use .is() for NULL comparison)
 
     if (error) {
       const errorMsg = error instanceof Error ? error.message : (error?.message || JSON.stringify(error));
