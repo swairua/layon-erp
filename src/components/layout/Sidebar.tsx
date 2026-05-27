@@ -65,7 +65,10 @@ const sidebarItems: SidebarItem[] = [
   {
     title: 'Fixed BOQ',
     icon: FileSpreadsheet,
-    href: '/fixed-boq'
+    children: [
+      { title: 'Standard', icon: FileSpreadsheet, href: '/fixed-boq' },
+      { title: 'Hierarchical', icon: FileSpreadsheet, href: '/fixed-boq-hierarchical' }
+    ]
   },
   {
     title: 'Payments',
