@@ -32,7 +32,7 @@ import { downloadBOQPDF, BoqDocument } from '@/utils/boqPdfGenerator';
 import { generateNextBOQNumber } from '@/utils/boqNumberGenerator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { saveBoqDraft, loadBoqDraft, deleteDraft, isDraftStale } from '@/services/boqAutoSaveService';
+import { saveBoqDraft, loadBoqDraft, deleteDraft, isDraftStale, cleanupDuplicateDrafts } from '@/services/boqAutoSaveService';
 
 // Safe UUID generator that works in all environments
 const generateSafeUUID = (): string => {
@@ -179,7 +179,10 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
             // Check if draft is stale (>30 minutes old)
             if (isDraftStale(draft.last_autosaved_at, 30 * 60 * 1000)) {
               console.log('[CreateBOQModal] Draft is stale, deleting and starting fresh');
-              await deleteDraft(profile.id, currentCompany.id);
+              const deleteResult = await deleteDraft(profile.id, currentCompany.id);
+              if (!deleteResult.success) {
+                console.error('[CreateBOQModal] Failed to delete stale draft:', deleteResult.error);
+              }
               // Start with fresh form (no restoration)
             } else {
               // Draft is fresh, restore it
@@ -243,6 +246,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
       setIsSavingDraft(true);
       setSaveError(null);
       setAuthReadyError(null);
+
       const selectedCustomer = customers.find(c => c.id === formData.clientId);
       const result = await saveBoqDraft(profile.id, currentCompany.id, {
         boqNumber: formData.boqNumber,
@@ -544,9 +548,22 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
         // This ensures single source of truth for terms_and_conditions and show_calculated_values_in_terms
       };
 
+      // Validate required fields before inserting
+      if (!currentCompany?.id) {
+        console.error('Company ID is missing');
+        toast.error('Company information is missing');
+        return;
+      }
+
+      if (!boqNumber) {
+        console.error('BOQ number is missing');
+        toast.error('BOQ number is required');
+        return;
+      }
+
       // Store BOQ in database
       const payload = {
-        company_id: currentCompany?.id || null,
+        company_id: currentCompany.id,
         number: boqNumber,
         boq_date: boqDate,
         due_date: dueDate,
@@ -569,10 +586,34 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
         created_by: profile?.id || null,
       };
 
-      const { error: insertError } = await supabase.from('boqs').insert([payload]);
+      console.log('[handleGenerate] Inserting BOQ with payload:', { number: payload.number, company_id: payload.company_id, total_amount: payload.total_amount });
+
+      const { data: insertedBOQ, error: insertError } = await supabase.from('boqs').insert([payload]).select('id');
       if (insertError) {
-        console.warn('Failed to store BOQ:', insertError);
-        toast.error('BOQ generated but failed to save to database');
+        // Extract error message from various error object formats
+        let errorMsg = 'Unknown error';
+        if (insertError instanceof Error) {
+          errorMsg = insertError.message;
+        } else if (typeof insertError === 'object' && insertError !== null) {
+          errorMsg = (insertError as any).message || (insertError as any).details || JSON.stringify(insertError);
+        }
+
+        console.error('Failed to store BOQ - Full error object:', insertError);
+        console.error('Failed to store BOQ - Error message:', errorMsg);
+        console.log('BOQ Payload that failed:', JSON.stringify(payload, null, 2));
+
+        if (errorMsg.includes('duplicate') || errorMsg.includes('unique')) {
+          toast.error(`BOQ number "${boqNumber}" already exists for this company`);
+        } else {
+          toast.error(`Failed to save BOQ: ${errorMsg}`);
+        }
+        return;
+      }
+
+      if (!insertedBOQ || insertedBOQ.length === 0) {
+        console.error('BOQ created but no ID returned');
+        toast.error('BOQ saved but no ID returned from database');
+        return;
       }
 
       await downloadBOQPDF(doc, currentCompany ? {
@@ -588,10 +629,16 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
       } : undefined);
 
       toast.success(`BOQ ${boqNumber} generated and saved`);
-      // Clear draft from database
+
+      // Clear draft from database after successful save
       if (profile?.id && currentCompany?.id) {
-        await deleteDraft(profile.id, currentCompany.id);
+        const deleteResult = await deleteDraft(profile.id, currentCompany.id);
+        if (!deleteResult.success) {
+          console.warn('Failed to delete draft after BOQ creation:', deleteResult.error);
+          toast.warning('BOQ created but draft cleanup failed — you may see it again next time');
+        }
       }
+
       onSuccess?.();
       handleOpenChange(false);
     } catch (err) {
@@ -629,11 +676,17 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
 
     // Clear draft from database
     if (profile?.id && currentCompany?.id) {
-      const result = await deleteDraft(profile.id, currentCompany.id);
-      if (result.success) {
+      const deleteResult = await deleteDraft(profile.id, currentCompany.id);
+
+      // Also clean up any duplicate drafts that may exist
+      if (deleteResult.success) {
+        const cleanupResult = await cleanupDuplicateDrafts(profile.id, currentCompany.id);
+        if (cleanupResult.deletedCount && cleanupResult.deletedCount > 0) {
+          console.log(`[handleClearForm] Cleaned up ${cleanupResult.deletedCount} duplicate drafts`);
+        }
         toast.success('Form cleared and draft reset');
       } else {
-        toast.error('Failed to clear draft');
+        toast.error('Failed to clear draft: ' + deleteResult.error);
       }
     } else {
       toast.success('Form cleared');

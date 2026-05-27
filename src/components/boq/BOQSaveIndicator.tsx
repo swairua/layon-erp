@@ -31,9 +31,9 @@ export function BOQSaveIndicator({
 
   if (saveError) {
     return (
-      <div className="flex items-center gap-2 text-sm text-red-600">
-        <AlertCircle className="h-4 w-4" />
-        <span title={saveError}>Save failed — will retry</span>
+      <div className="flex items-center gap-2 text-sm text-red-600" title={saveError}>
+        <AlertCircle className="h-4 w-4 flex-shrink-0" />
+        <span className="truncate">Save failed — will retry</span>
       </div>
     );
   }
