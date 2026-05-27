@@ -45,7 +45,7 @@ export interface BOQDraftRecord {
   total_amount: number;
   data: any;
   terms_and_conditions: string;
-  showCalculatedValuesInTerms: boolean;
+  show_calculated_values_in_terms: boolean;
   created_at: string;
   updated_at: string;
   last_autosaved_at: string;
