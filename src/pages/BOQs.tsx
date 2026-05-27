@@ -196,7 +196,7 @@ export default function BOQs() {
 
       // Use ONLY top-level columns for terms (single source of truth)
       const termsToUse = boqToUse.terms_and_conditions || '';
-      const showCalculatedValues = boqToUse.show_calculated_values_in_terms || false;
+      const showCalculatedValues = boqToUse.showCalculatedValuesInTerms || false;
 
       // Log term retrieval for diagnostics
       console.log('BOQ Terms Retrieval Diagnostic:', {
@@ -205,7 +205,7 @@ export default function BOQs() {
         hasTopLevelTerms: !!boqToUse.terms_and_conditions,
         topLevelTermsLength: boqToUse.terms_and_conditions?.length || 0,
         finalTermsLength: termsToUse.length,
-        topLevelShowCalcValues: boqToUse.show_calculated_values_in_terms,
+        topLevelShowCalcValues: boqToUse.showCalculatedValuesInTerms,
         finalShowCalcValues: showCalculatedValues,
       });
 

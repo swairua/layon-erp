@@ -208,7 +208,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
           notes: changes.notes,
         },
         terms_and_conditions: changes.termsAndConditions || null,
-        show_calculated_values_in_terms: changes.showCalculatedValuesInTerms,
+        showCalculatedValuesInTerms: changes.showCalculatedValuesInTerms,
       };
 
       const result = await saveEditingDraft(profile.id, currentCompany.id, boq.id, draftData);
@@ -611,7 +611,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess }: EditBOQModa
         total_amount: filledSubtotal,
         data: doc,
         terms_and_conditions: termsAndConditions || null,
-        show_calculated_values_in_terms: showCalculatedValuesInTerms,
+        showCalculatedValuesInTerms: showCalculatedValuesInTerms,
       };
 
       const { error: updateError } = await supabase.from('boqs').update(payload).eq('id', boq.id);
