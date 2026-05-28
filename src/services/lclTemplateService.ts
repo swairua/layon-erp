@@ -138,11 +138,21 @@ export class LCLTemplateService {
     // Fetch all items for this structure
     const items = await this.getStructureItems(structureId);
 
+    // Deduplicate sections to prevent duplicate key errors
+    const seenSectionIds = new Set<string>();
+    const uniqueSections = structure.structure_data.sections.filter((section: any) => {
+      if (seenSectionIds.has(section.id)) {
+        return false;
+      }
+      seenSectionIds.add(section.id);
+      return true;
+    });
+
     // Build hierarchical view
     const sections: LCLSectionWithSubsections[] = [];
     let grand_total = 0;
 
-    for (const sectionDef of structure.structure_data.sections) {
+    for (const sectionDef of uniqueSections) {
       const subsections: LCLSubsectionWithItems[] = [];
       let section_total = 0;
 

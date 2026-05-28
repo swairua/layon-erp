@@ -3,11 +3,12 @@
 
 -- Helper: Get the default LCL structure IDs by company
 WITH lcl_structures AS (
-  SELECT id, company_id FROM lcl_template_structures 
+  SELECT id, company_id FROM lcl_template_structures
   WHERE name = 'LCL Default BOQ'
+    AND NOT (structure_data->'sections' @> jsonb_build_array(jsonb_build_object('id', 'section_h')))
 ),
 update_structures AS (
-  -- Update existing structures to append Section H
+  -- Update existing structures to append Section H (only if it doesn't already exist)
   UPDATE lcl_template_structures
   SET structure_data = jsonb_set(
     structure_data,
@@ -24,7 +25,7 @@ update_structures AS (
     )
   ),
   updated_at = NOW()
-  WHERE name = 'LCL Default BOQ'
+  WHERE id IN (SELECT id FROM lcl_structures)
   RETURNING id, company_id
 )
 -- Insert Section H items
