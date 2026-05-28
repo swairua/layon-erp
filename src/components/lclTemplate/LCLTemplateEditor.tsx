@@ -105,6 +105,88 @@ export function LCLTemplateEditor({
     return Object.values(totals).reduce((sum, t) => sum + t.section, 0);
   };
 
+  // Flatten hierarchy into a list with header markers (like PDF generator)
+  interface FlatItem {
+    id: string;
+    type: 'sectionHeader' | 'subsectionHeader' | 'item' | 'subtotal' | 'sectionTotal';
+    description: string;
+    quantity?: number;
+    unit_price?: number;
+    line_total?: number;
+    unit_of_measure?: string;
+    item?: LCLItemWithCalculations;
+    sectionId?: string;
+    subsectionId?: string;
+    sectionLetter?: string;
+    sectionName?: string;
+    subsectionName?: string;
+  }
+
+  const flattenedItems: FlatItem[] = [];
+  data.sections.forEach((section, sectionIndex) => {
+    const sectionLetter = String.fromCharCode(65 + sectionIndex);
+
+    // Add section header
+    flattenedItems.push({
+      id: `section-header-${section.section_id}`,
+      type: 'sectionHeader',
+      description: `SECTION ${sectionLetter}: ${section.section_name}`,
+      sectionLetter,
+      sectionName: section.section_name,
+      sectionId: section.section_id,
+    });
+
+    // Add subsections and items
+    section.subsections.forEach((subsection) => {
+      // Add subsection header
+      flattenedItems.push({
+        id: `subsection-header-${subsection.subsection_id}`,
+        type: 'subsectionHeader',
+        description: `→ ${subsection.subsection_name}`,
+        subsectionName: subsection.subsection_name,
+        subsectionId: subsection.subsection_id,
+        sectionId: section.section_id,
+      });
+
+      // Add items
+      subsection.items.forEach((item) => {
+        flattenedItems.push({
+          id: item.id,
+          type: 'item',
+          description: item.description,
+          quantity: inlineEdits[item.id]?.qty !== undefined ? inlineEdits[item.id].qty : (item.default_qty || 0),
+          unit_price: inlineEdits[item.id]?.rate !== undefined ? inlineEdits[item.id].rate : (item.default_rate || 0),
+          line_total: getItemAmount(item),
+          unit_of_measure: item.unit,
+          item,
+          sectionId: section.section_id,
+          subsectionId: subsection.subsection_id,
+        });
+      });
+
+      // Add subsection subtotal
+      const subtotal = totals[section.section_id]?.subsections[subsection.subsection_id] || 0;
+      flattenedItems.push({
+        id: `subtotal-${subsection.subsection_id}`,
+        type: 'subtotal',
+        description: `Subtotal - ${subsection.subsection_name}`,
+        line_total: subtotal,
+        sectionId: section.section_id,
+        subsectionId: subsection.subsection_id,
+      });
+    });
+
+    // Add section total
+    const sectionTotal = totals[section.section_id]?.section || 0;
+    flattenedItems.push({
+      id: `section-total-${section.section_id}`,
+      type: 'sectionTotal',
+      description: `SECTION ${sectionLetter} TOTAL: ${section.section_name}`,
+      line_total: sectionTotal,
+      sectionId: section.section_id,
+    });
+  });
+
   const handleInlineQtyChange = (itemId: string, value: string) => {
     const qty = parseFloat(value) || 0;
     if (qty < 0) return;
