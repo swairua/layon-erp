@@ -931,21 +931,23 @@ export const generatePDF = async (data: DocumentData) => {
 
       const closeTable = () => {
         if (currentTableRows.length > 0) {
-          tablesHtml += `<table class="items" style="margin-bottom: 8mm;${!isFirstTable ? ' margin-top: 8px;' : ''}">
-            <thead>
-              <tr>
-                <th style="width:5%; font-weight: bold;">#</th>
-                <th style="width:45%; text-align:left; font-weight: bold;">Item Description</th>
-                <th style="width:10%; font-weight: bold;">Qty</th>
-                <th style="width:10%; font-weight: bold;">Unit</th>
-                <th style="width:15%; font-weight: bold;">Rate (${data.currency || 'KES'})</th>
-                <th style="width:15%; text-align:right; font-weight: bold;">Amount (${data.currency || 'KES'})</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${currentTableRows.join('')}
-            </tbody>
-          </table>`;
+          tablesHtml += `<div class="section-block" style="page-break-before: ${isFirstTable ? 'avoid' : 'always'} !important; page-break-inside: avoid !important; break-before: ${isFirstTable ? 'avoid' : 'page'};">
+            <table class="items" style="margin-bottom: 8mm; margin-left: 15mm; margin-right: 15mm; width: calc(100% - 30mm);${!isFirstTable ? ' margin-top: 8px;' : ''}">
+              <thead>
+                <tr>
+                  <th style="width:5%; font-weight: bold;">#</th>
+                  <th style="width:45%; text-align:left; font-weight: bold;">Item Description</th>
+                  <th style="width:10%; font-weight: bold;">Qty</th>
+                  <th style="width:10%; font-weight: bold;">Unit</th>
+                  <th style="width:15%; font-weight: bold;">Rate (${data.currency || 'KES'})</th>
+                  <th style="width:15%; text-align:right; font-weight: bold;">Amount (${data.currency || 'KES'})</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${currentTableRows.join('')}
+              </tbody>
+            </table>
+          </div>`;
           currentTableRows = [];
           isFirstTable = false;
         }
