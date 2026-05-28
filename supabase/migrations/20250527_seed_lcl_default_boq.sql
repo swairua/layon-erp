@@ -135,7 +135,7 @@ LATERAL (
   SELECT 'section_a', 'section_a_labor', '11', 'Foundation Slab Concreting', 'Item', 1, 28000, 10 UNION ALL
   
   -- SECTION B: GROUND FLOOR WALLING - MATERIALS
-  SELECT 'section_b', 'section_b_materials', '1', 'Machine Cut Stones 9 by 9', 'Pcs', 2800, 60, 0 UNION ALL
+  SELECT 'section_b', 'section_b_materials', '1', 'Machine Cut Stones 6 by 9', 'Pcs', 2800, 60, 0 UNION ALL
   SELECT 'section_b', 'section_b_materials', '2', 'Machine-cut 6x9', 'Pcs', 100, 60, 1 UNION ALL
   SELECT 'section_b', 'section_b_materials', '3', 'Quarry dust', 'Trucks', 1, 30000, 2 UNION ALL
   SELECT 'section_b', 'section_b_materials', '4', 'Rock sand', 'Trucks', 2, 30000, 3 UNION ALL
