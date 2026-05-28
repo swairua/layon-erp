@@ -14,20 +14,24 @@ BEGIN
   WITH reordered AS (
     SELECT
       id,
-      ROW_NUMBER() OVER (ORDER BY sort_order) AS new_item_number,
-      ROW_NUMBER() OVER (ORDER BY sort_order) - 1 AS new_sort_order
+      ROW_NUMBER() OVER (
+        ORDER BY sort_order, created_at, id
+      ) AS new_item_number,
+      ROW_NUMBER() OVER (
+        ORDER BY sort_order, created_at, id
+      ) - 1 AS new_sort_order
     FROM lcl_template_items
     WHERE section_id = OLD.section_id
       AND subsection_id = OLD.subsection_id
   )
-  UPDATE lcl_template_items
+  UPDATE lcl_template_items li
   SET
     item_number = reordered.new_item_number::text,
     sort_order = reordered.new_sort_order,
     updated_at = NOW()
   FROM reordered
-  WHERE lcl_template_items.id = reordered.id;
-  
+  WHERE li.id = reordered.id;
+
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
