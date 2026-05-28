@@ -794,7 +794,7 @@ export const generatePDF = async (data: DocumentData) => {
   console.log('📋 Items count:', data.items?.length || 0);
   console.log('📑 Sections count:', data.sections?.length || 0);
   console.log('💰 Total amount:', data.total_amount);
-  console.log('[generatePDF] LCL BOQ flags:', {
+  console.error('[generatePDF] ⚠️ LCL BOQ flags CHECK:', {
     isLCLBOQ: data.isLCLBOQ,
     type: data.type,
     willUseLCLBranch: data.isLCLBOQ && data.type === 'boq',
