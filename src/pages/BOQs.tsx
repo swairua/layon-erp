@@ -732,7 +732,14 @@ export default function BOQs() {
                         <TableCell className="text-right text-xs md:text-sm">{new Intl.NumberFormat('en-KE', { style: 'currency', currency: b.currency || 'KES' }).format(Number(b.total_amount || b.subtotal || 0))}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 md:gap-2 flex-wrap">
-                            <Button size="icon" variant="ghost" onClick={() => setViewing(b)} title="View" className="h-8 w-8 md:h-9 md:w-9">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => !linkedBOQIds.has(b.id) && setViewing(b)}
+                              title={linkedBOQIds.has(b.id) ? "View unavailable: Linked to LCL template" : "View"}
+                              disabled={linkedBOQIds.has(b.id)}
+                              className="h-8 w-8 md:h-9 md:w-9"
+                            >
                               <Eye className="h-3 w-3 md:h-4 md:w-4" />
                             </Button>
                             <Button
@@ -745,7 +752,14 @@ export default function BOQs() {
                             >
                               <Pencil className="h-3 w-3 md:h-4 md:w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" onClick={() => handleDownloadPDF(b)} title="Download PDF" className="h-8 w-8 md:h-9 md:w-9">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => !linkedBOQIds.has(b.id) && handleDownloadPDF(b)}
+                              title={linkedBOQIds.has(b.id) ? "Download unavailable: Linked to LCL template" : "Download PDF"}
+                              disabled={linkedBOQIds.has(b.id)}
+                              className="h-8 w-8 md:h-9 md:w-9"
+                            >
                               <Download className="h-3 w-3 md:h-4 md:w-4" />
                             </Button>
                             {b.number === 'BOQ-20251124-1441' && (
