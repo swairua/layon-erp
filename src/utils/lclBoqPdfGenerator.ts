@@ -120,6 +120,7 @@ function flattenLCLBOQItems(data: LCLHierarchicalData): Array<{
 /**
  * Reconstructs hierarchical data from a flat items snapshot.
  * Converts flat array of items back to the hierarchical structure expected by downloadLCLBOQPDF.
+ * Uses preserved section/subsection names from items, with fallback to generated names.
  */
 export function reconstructHierarchicalDataFromSnapshot(
   flatItems: ItemSnapshot[]
@@ -152,6 +153,7 @@ export function reconstructHierarchicalDataFromSnapshot(
       let preservedSubsectionName: string | undefined;
 
       const processedItems = items.map((item) => {
+        // Preserve section and subsection names from snapshot
         if (!preservedSectionName && item.section_name) {
           preservedSectionName = item.section_name;
         }
@@ -180,9 +182,10 @@ export function reconstructHierarchicalDataFromSnapshot(
       sectionTotal += subtotal;
     });
 
-    const sectionLetter = sectionId.replace('section-', '').toUpperCase();
+    const sectionLetter = sectionId.replace(/[^\w]/g, '').match(/[a-zA-Z]/)?.[0]?.toUpperCase() || 'A';
     sections.push({
       section_id: sectionId,
+      // Use preserved section name from snapshot, fallback to constructed name
       section_name: preservedSectionName || `SECTION ${sectionLetter}`,
       subsections,
       total: sectionTotal,

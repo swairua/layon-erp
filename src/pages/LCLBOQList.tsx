@@ -5,6 +5,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useCurrentCompany } from '@/contexts/CompanyContext';
 import { lclBoqService, LCLBOQRecord } from '@/services/lclBoqService';
 import { useCustomers } from '@/hooks/useDatabase';
+import { lclTemplateService } from '@/services/lclTemplateService';
+import { LCLTemplateStructure } from '@/types/lclTemplate';
 import {
   Table,
   TableBody,
@@ -31,10 +33,26 @@ export default function LCLBOQList() {
   const [selectedBoq, setSelectedBoq] = useState<LCLBOQRecord | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [templateStructure, setTemplateStructure] = useState<LCLTemplateStructure | undefined>();
 
   useEffect(() => {
     loadBoqs();
+    loadTemplateStructure();
   }, [companyId]);
+
+  const loadTemplateStructure = async () => {
+    if (!companyId) return;
+    try {
+      const structures = await lclTemplateService.getStructures(companyId);
+      const defaultStructure = structures.find(
+        (s) => s.name.toLowerCase().includes('default')
+      ) || structures[0];
+      setTemplateStructure(defaultStructure);
+    } catch (error) {
+      console.error('Error loading template structure:', error);
+      // Gracefully fail - modal will work with fallback
+    }
+  };
 
   const loadBoqs = async () => {
     if (!companyId) return;
@@ -287,6 +305,7 @@ export default function LCLBOQList() {
           onClose={() => setShowEditModal(false)}
           boq={selectedBoq}
           onSaved={handleEditSaved}
+          templateStructure={templateStructure}
         />
       )}
 

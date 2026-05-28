@@ -23,13 +23,14 @@ import { CheckCircle2, AlertCircle, Download } from 'lucide-react';
 import { useCurrentCompany } from '@/contexts/CompanyContext';
 import { useCustomers } from '@/hooks/useDatabase';
 import { downloadLCLBOQPDF } from '@/utils/lclBoqPdfGenerator';
-import { LCLHierarchicalData } from '@/types/lclTemplate';
+import { LCLHierarchicalData, LCLTemplateStructure } from '@/types/lclTemplate';
 
 interface EditLCLBOQModalProps {
   isOpen: boolean;
   onClose: () => void;
   boq: LCLBOQRecord;
   onSaved: () => Promise<void>;
+  templateStructure?: LCLTemplateStructure;
 }
 
 interface InlineEdit {
@@ -56,6 +57,7 @@ export function EditLCLBOQModal({
   onClose,
   boq,
   onSaved,
+  templateStructure,
 }: EditLCLBOQModalProps) {
   const [items, setItems] = useState<ItemSnapshot[]>([]);
   const [inlineEdits, setInlineEdits] = useState<{ [itemId: string]: InlineEdit }>({});
@@ -68,16 +70,37 @@ export function EditLCLBOQModal({
   const { currentCompany } = useCurrentCompany();
   const { data: customers } = useCustomers(currentCompany?.id || '');
 
-  const extractSections = (itemsSnapshot: ItemSnapshot[]): string[] => {
-    const sectionsSet = new Set<string>();
+  // Helper function to get section name from template or items snapshot
+  const getSectionNameFromTemplate = (sectionId: string): string | undefined => {
+    if (!templateStructure || !templateStructure.structure_data?.sections) {
+      return undefined;
+    }
+
+    const match = sectionId?.match(/section_([a-z])/i);
+    if (!match) return undefined;
+
+    const sectionIndex = match[1].toUpperCase().charCodeAt(0) - 65; // Convert A->0, B->1, etc.
+    const section = templateStructure.structure_data.sections[sectionIndex];
+    return section?.name;
+  };
+
+  const extractSections = (itemsSnapshot: ItemSnapshot[]): Array<{ letter: string; name?: string }> => {
+    const sectionsMap = new Map<string, { letter: string; name?: string }>();
     itemsSnapshot.forEach((item) => {
-      // Extract section letter from section_id (e.g., "section_a" -> "A")
       const match = item.section_id?.match(/section_([a-z])/i);
       if (match) {
-        sectionsSet.add(match[1].toUpperCase());
+        const letter = match[1].toUpperCase();
+        if (!sectionsMap.has(letter)) {
+          // Use section_name from snapshot, or fallback to template
+          const sectionName = item.section_name || getSectionNameFromTemplate(item.section_id);
+          sectionsMap.set(letter, {
+            letter,
+            name: sectionName,
+          });
+        }
       }
     });
-    return Array.from(sectionsSet).sort();
+    return Array.from(sectionsMap.values()).sort((a, b) => a.letter.localeCompare(b.letter));
   };
 
   const getItemsForSection = (sectionLetter: string): ItemSnapshot[] => {
@@ -87,12 +110,22 @@ export function EditLCLBOQModal({
     });
   };
 
+  const getSectionName = (sectionLetter: string): string => {
+    const sectionItem = items.find((item) => {
+      const match = item.section_id?.match(/section_([a-z])/i);
+      return match && match[1].toUpperCase() === sectionLetter;
+    });
+    // Use section_name from snapshot, or fallback to template, or use generic name
+    const name = sectionItem?.section_name || getSectionNameFromTemplate(sectionItem?.section_id);
+    return name ? `SECTION ${sectionLetter}: ${name}` : `SECTION ${sectionLetter}`;
+  };
+
   const reconstructHierarchicalData = (): LCLHierarchicalData => {
     const sections: any[] = [];
     const sectionLetters = extractSections(items);
 
-    sectionLetters.forEach((letter) => {
-      const sectionItems = getItemsForSection(letter);
+    sectionLetters.forEach((sectionObj) => {
+      const sectionItems = getItemsForSection(sectionObj.letter);
       const subsectionsMap = new Map<string, ItemSnapshot[]>();
 
       sectionItems.forEach((item) => {
@@ -107,10 +140,17 @@ export function EditLCLBOQModal({
 
       subsectionsMap.forEach((subsectionItems, subsectionId) => {
         let subtotal = 0;
-        const processedItems = subsectionItems.map((item) => ({
-          ...item,
-          amount: item.qty * item.rate,
-        }));
+        let preservedSubsectionName: string | undefined;
+
+        const processedItems = subsectionItems.map((item) => {
+          if (!preservedSubsectionName && item.subsection_name) {
+            preservedSubsectionName = item.subsection_name;
+          }
+          return {
+            ...item,
+            amount: item.qty * item.rate,
+          };
+        });
 
         subsectionItems.forEach((item) => {
           subtotal += item.qty * item.rate;
@@ -118,7 +158,7 @@ export function EditLCLBOQModal({
 
         subsections.push({
           subsection_id: subsectionId,
-          subsection_name: subsectionId,
+          subsection_name: preservedSubsectionName || subsectionId,
           items: processedItems,
           subtotal,
         });
@@ -127,8 +167,8 @@ export function EditLCLBOQModal({
       });
 
       sections.push({
-        section_id: `section-${letter}`,
-        section_name: `SECTION ${letter}`,
+        section_id: `section-${sectionObj.letter}`,
+        section_name: sectionObj.name || `SECTION ${sectionObj.letter}`,
         subsections,
         total: sectionTotal,
       });
@@ -151,7 +191,7 @@ export function EditLCLBOQModal({
       inlineEditsRef.current = {};
       const sections = extractSections(boq.items_snapshot);
       if (sections.length > 0) {
-        setActiveSection(sections[0]);
+        setActiveSection(sections[0].letter);
       }
     }
   }, [isOpen, boq]);
@@ -353,7 +393,7 @@ export function EditLCLBOQModal({
               <DialogTitle>Edit LCL BOQ - {boq.number}</DialogTitle>
               {activeSection && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Section {activeSection}
+                  {getSectionName(activeSection)}
                 </p>
               )}
               {boq.id && (
@@ -378,18 +418,18 @@ export function EditLCLBOQModal({
         </DialogHeader>
 
         {sections.length > 0 && (
-          <div className="flex gap-2 border-b pb-2">
+          <div className="flex gap-2 border-b pb-2 overflow-x-auto">
             {sections.map((section) => (
               <button
-                key={section}
-                onClick={() => setActiveSection(section)}
-                className={`px-3 py-2 text-sm font-medium rounded-t border-b-2 transition-colors ${
-                  activeSection === section
+                key={section.letter}
+                onClick={() => setActiveSection(section.letter)}
+                className={`px-3 py-2 text-sm font-medium rounded-t border-b-2 transition-colors whitespace-nowrap ${
+                  activeSection === section.letter
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
-                Section {section}
+                {section.name ? `${section.letter}: ${section.name}` : `SECTION ${section.letter}`}
               </button>
             ))}
           </div>
@@ -473,7 +513,7 @@ export function EditLCLBOQModal({
             <div className="flex justify-end border-t pt-4">
               <div className="text-right">
                 <div className="text-sm text-muted-foreground mb-2">
-                  Section {activeSection} Total
+                  {getSectionName(activeSection)} Total
                 </div>
                 <div className="text-2xl font-bold">
                   {currentSectionItems
