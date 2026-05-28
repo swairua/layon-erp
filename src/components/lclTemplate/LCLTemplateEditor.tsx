@@ -570,7 +570,11 @@ export function LCLTemplateEditor({
             {/* Subsections and items */}
             {expandedSections.has(section.section_id) && (
               <div className="border-t border-border">
-                {section.subsections.map((subsection) => (
+                {section.subsections.map((subsection, subsectionIndex) => {
+                  const sectionLetter = String.fromCharCode(65 + data.sections.findIndex(s => s.section_id === section.section_id));
+                  const isFirstSubsection = subsectionIndex === 0;
+
+                  return (
                   <div key={subsection.subsection_id}>
                     {/* Subsection header */}
                     <button
@@ -610,6 +614,22 @@ export function LCLTemplateEditor({
                             </TableRow>
                           </TableHeader>
                           <TableBody>
+                            {/* Section header - shown only for first subsection */}
+                            {isFirstSubsection && (
+                              <TableRow className="bg-gray-100 hover:bg-gray-100 cursor-default">
+                                <TableCell colSpan={7} className="text-sm font-bold text-gray-700 py-2">
+                                  SECTION {sectionLetter}: {section.section_name}
+                                </TableCell>
+                              </TableRow>
+                            )}
+
+                            {/* Subsection header */}
+                            <TableRow className="bg-gray-50 hover:bg-gray-50 cursor-default">
+                              <TableCell colSpan={7} className="text-sm font-semibold py-2 pl-8">
+                                → {subsection.subsection_name}
+                              </TableCell>
+                            </TableRow>
+
                             {subsection.items.map((item) => (
                               <TableRow
                                 key={item.id}
@@ -786,6 +806,15 @@ export function LCLTemplateEditor({
                               </TableRow>
                             ))}
 
+                            {/* Subsection subtotal */}
+                            <TableRow className="bg-gray-100 hover:bg-gray-100 cursor-default font-semibold">
+                              <TableCell colSpan={5} className="text-sm py-2"></TableCell>
+                              <TableCell className="text-right text-sm font-semibold py-2">
+                                Ksh{(totals[section.section_id]?.subsections[subsection.subsection_id] || 0).toLocaleString('en-KE', { maximumFractionDigits: 2 })}
+                              </TableCell>
+                              <TableCell></TableCell>
+                            </TableRow>
+
                             {/* Add new item row */}
                             {addingItemTo === subsection.subsection_id &&
                             editingItem ? (
@@ -913,7 +942,8 @@ export function LCLTemplateEditor({
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
