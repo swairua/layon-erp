@@ -924,22 +924,16 @@ export const generatePDF = async (data: DocumentData) => {
     let sectionCount = 0;
 
     if (data.isLCLBOQ) {
-      // LCL BOQ: render section/subsection headers as div separators with per-subsection tables
+      // LCL BOQ: render section/subsection headers as table rows (not separate divs)
       let currentTableRows: string[] = [];
-      let pendingHeaders: string[] = [];
-      let isFirstTable = true;
+      let isFirstSection = true;
       let itemIndex = 0;
+      let sectionHeaderRendered = false;
 
       const closeTable = () => {
-        if (currentTableRows.length > 0 || pendingHeaders.length > 0) {
-          const headersHtml = pendingHeaders.map(h =>
-            `<div style="font-weight: bold; margin-top: 16px; margin-bottom: 8px; padding: 8px 10px; background-color: #f4f4f4; border-left: 3px solid #333; font-size: 11px;">${h}</div>`
-          ).join('');
-          pendingHeaders = [];
-
-          tablesHtml += `<div class="section-block" style="page-break-before: ${isFirstTable ? 'avoid' : 'always'} !important; page-break-inside: avoid !important; break-before: ${isFirstTable ? 'avoid' : 'page'};">
-            ${headersHtml}
-            <table class="items" style="margin-bottom: 8mm; margin-left: 15mm; margin-right: 15mm; width: calc(100% - 30mm);${!isFirstTable ? ' margin-top: 8px;' : ''}">
+        if (currentTableRows.length > 0) {
+          tablesHtml += `<div class="section-block" style="page-break-before: ${isFirstSection ? 'avoid' : 'always'} !important; page-break-inside: avoid !important; break-before: ${isFirstSection ? 'avoid' : 'page'};">
+            <table class="items" style="margin-bottom: 8mm; margin-left: 15mm; margin-right: 15mm; width: calc(100% - 30mm);${!isFirstSection ? ' margin-top: 8px;' : ''}">
               <thead>
                 <tr>
                   <th style="width:5%; font-weight: bold;">#</th>
@@ -956,21 +950,42 @@ export const generatePDF = async (data: DocumentData) => {
             </table>
           </div>`;
           currentTableRows = [];
-          isFirstTable = false;
+          isFirstSection = false;
+          itemIndex = 0;
+          sectionHeaderRendered = false;
         }
       };
 
       (data.items || []).forEach((item) => {
         if ((item as any)._isSectionHeader) {
-          closeTable();
-          pendingHeaders.push(item.description);
-          itemIndex = 1;
+          const isFirstSubsection = (item as any)._isFirstSubsection;
+
+          // For section headers, reset item counter
+          if (!sectionHeaderRendered) {
+            itemIndex = 1;
+            sectionHeaderRendered = true;
+          }
+
+          // Render header as table row with appropriate styling
+          const headerStyle = isFirstSubsection
+            ? "font-weight: bold; background-color: #333; color: white; padding: 8px 10px;"
+            : "font-weight: bold; background-color: #f4f4f4; color: #333; padding: 8px 10px;";
+
+          currentTableRows.push(`<tr style="${headerStyle}">
+            <td colspan="6" style="text-align: left; padding: 8px 10px;">${item.description}</td>
+          </tr>`);
         } else if ((item as any)._isSubtotal || (item as any)._isSectionTotal) {
+          // Section/subsection total is a signal to close the table
           currentTableRows.push(`<tr style="font-weight: bold; background-color: #f5f5f5;">
             <td style="padding: 6px 8px;"></td>
             <td colspan="4" style="text-align: right; padding: 6px 8px;">${item.description}</td>
             <td style="text-align: right; padding: 6px 8px; font-weight: 700;">${formatCurrency(item.line_total)}</td>
           </tr>`);
+
+          // Close table after section total (each section gets its own table)
+          if ((item as any)._isSectionTotal) {
+            closeTable();
+          }
         } else {
           currentTableRows.push(`<tr>
             <td style="padding: 4px 8px; text-align: center;">${itemIndex}</td>

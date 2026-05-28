@@ -33,6 +33,7 @@ function flattenLCLBOQItems(data: LCLHierarchicalData): Array<{
   _isSectionHeader?: boolean;
   _isSubtotal?: boolean;
   _isSectionTotal?: boolean;
+  _isFirstSubsection?: boolean;
 }> {
   const flatItems: Array<{
     description: string;
@@ -43,6 +44,7 @@ function flattenLCLBOQItems(data: LCLHierarchicalData): Array<{
     _isSectionHeader?: boolean;
     _isSubtotal?: boolean;
     _isSectionTotal?: boolean;
+    _isFirstSubsection?: boolean;
   }> = [];
 
   data.sections.forEach((section, sectionIndex) => {
@@ -61,7 +63,9 @@ function flattenLCLBOQItems(data: LCLHierarchicalData): Array<{
     });
 
     // Add subsections and items
-    section.subsections.forEach((subsection) => {
+    section.subsections.forEach((subsection, subsectionIndex) => {
+      const isFirstSubsection = subsectionIndex === 0;
+
       // Add subsection header
       flatItems.push({
         description: `Subsection ${subsection.subsection_name}`,
@@ -71,6 +75,7 @@ function flattenLCLBOQItems(data: LCLHierarchicalData): Array<{
         unit_of_measure: undefined,
         _isSectionHeader: true,
         _isSubtotal: false,
+        _isFirstSubsection: isFirstSubsection,
       });
 
       // Add items
