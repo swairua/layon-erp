@@ -216,5 +216,6 @@ export async function downloadLCLBOQPDF(
     currency: currency,
     customTitle: options?.customTitle,
     stampImageUrl: options?.stampImageUrl,
+    isLCLBOQ: true,
   });
 }

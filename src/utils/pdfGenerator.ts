@@ -414,6 +414,7 @@ export interface DocumentData {
   customTitle?: string; // Optional custom title for BOQ PDFs
   stampImageUrl?: string; // Optional stamp image URL for special PDFs
   display_as_percentage?: boolean; // Whether to display calculated values instead of percentages in PDF
+  isLCLBOQ?: boolean; // Whether this is an LCL BOQ (applies table-splitting for each subsection)
   customer: {
     name: string;
     email?: string;
@@ -3272,6 +3273,66 @@ export const generatePDF = async (data: DocumentData) => {
         <!-- Items Section -->
         ${data.items && data.items.length > 0 ? `
         <div class="items-section">
+          ${data.isLCLBOQ && data.type === 'boq' ? (() => {
+            let tableHtml = '';
+            let currentTable: string[] = [];
+            let isFirstTable = true;
+            let itemIndex = 0;
+
+            const closeTable = () => {
+              if (currentTable.length > 0) {
+                tableHtml += `<table class="items-table" style="${!isFirstTable ? 'margin-top: 20px;' : ''}">
+                  <thead>
+                    <tr>
+                      <th style="width: 5%;">#</th>
+                      <th style="width: 45%;">Item Description</th>
+                      <th style="width: 10%;">Qty</th>
+                      <th style="width: 10%;">Unit</th>
+                      <th style="width: 15%;">Rate</th>
+                      <th style="width: 15%;">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${currentTable.join('')}
+                  </tbody>
+                </table>`;
+                currentTable = [];
+                isFirstTable = false;
+              }
+            };
+
+            data.items.forEach((item) => {
+              if ((item as any)._isSectionHeader) {
+                // Close previous table and start a new one for this subsection
+                closeTable();
+                itemIndex = 1;
+              } else if ((item as any)._isSubtotal || (item as any)._isSectionTotal) {
+                // Add subtotal row to current table
+                currentTable.push(`
+                  <tr style="font-weight: bold; background-color: #f5f5f5;">
+                    <td colspan="5" style="text-align: right;">${item.description}</td>
+                    <td class="amount-cell">${formatCurrency(item.line_total)}</td>
+                  </tr>
+                `);
+              } else {
+                // Regular item row
+                currentTable.push(`
+                  <tr>
+                    <td>${itemIndex}</td>
+                    <td class="description-cell">${item.description}</td>
+                    <td>${item.quantity}</td>
+                    <td>${(item as any).unit_of_measure || (item as any).unit || 'Item'}</td>
+                    <td class="amount-cell">${formatCurrency(item.unit_price)}</td>
+                    <td class="amount-cell">${formatCurrency(item.line_total)}</td>
+                  </tr>
+                `);
+                itemIndex++;
+              }
+            });
+
+            closeTable();
+            return tableHtml;
+          })() : `
           <table class="items-table">
             <thead>
               <tr>
@@ -3359,6 +3420,7 @@ export const generatePDF = async (data: DocumentData) => {
               `).join('')}
             </tbody>
           </table>
+          `}
         </div>
         ` : ''}
         

@@ -49,6 +49,7 @@ export interface BoqPdfOptions {
   invoiceNumber?: string;
   invoiceDate?: string;
   useCurrentDate?: boolean;
+  isLCLBOQ?: boolean;
 }
 
 export async function downloadBOQPDF(doc: BoqDocument, company?: { name: string; logo_url?: string; address?: string; city?: string; country?: string; phone?: string; email?: string }, options?: BoqPdfOptions) {
@@ -239,6 +240,7 @@ export async function downloadBOQPDF(doc: BoqDocument, company?: { name: string;
     showCalculatedValuesInTerms: doc.showCalculatedValuesInTerms,
     currency: currency,
     customTitle: options?.customTitle,
-    stampImageUrl: options?.stampImageUrl
+    stampImageUrl: options?.stampImageUrl,
+    isLCLBOQ: options?.isLCLBOQ
   });
 }
