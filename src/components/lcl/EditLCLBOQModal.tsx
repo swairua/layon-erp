@@ -63,6 +63,7 @@ export function EditLCLBOQModal({
   const [downloading, setDownloading] = useState(false);
   const debounceTimers = useRef<{ [itemId: string]: NodeJS.Timeout }>({});
   const inlineEditsRef = useRef<{ [itemId: string]: InlineEdit }>({});
+  const isMountedRef = useRef(true);
   const { toast } = useToast();
   const { currentCompany } = useCurrentCompany();
   const { data: customers } = useCustomers(currentCompany?.id || '');
@@ -162,6 +163,7 @@ export function EditLCLBOQModal({
 
   useEffect(() => {
     return () => {
+      isMountedRef.current = false;
       Object.values(debounceTimers.current).forEach((timer) => clearTimeout(timer));
     };
   }, []);
@@ -200,13 +202,7 @@ export function EditLCLBOQModal({
     }
 
     debounceTimers.current[itemId] = setTimeout(() => {
-      const freshEdit = inlineEditsRef.current[itemId] || {};
-      saveInlineEdit(
-        itemIndex,
-        freshEdit.qty,
-        freshEdit.rate,
-        freshEdit.description
-      );
+      saveInlineEdit(itemIndex);
     }, 500);
   };
 
@@ -228,13 +224,7 @@ export function EditLCLBOQModal({
     }
 
     debounceTimers.current[itemId] = setTimeout(() => {
-      const freshEdit = inlineEditsRef.current[itemId] || {};
-      saveInlineEdit(
-        itemIndex,
-        freshEdit.qty,
-        freshEdit.rate,
-        freshEdit.description
-      );
+      saveInlineEdit(itemIndex);
     }, 500);
   };
 
@@ -251,33 +241,33 @@ export function EditLCLBOQModal({
     }
 
     debounceTimers.current[itemId] = setTimeout(() => {
-      const freshEdit = inlineEditsRef.current[itemId] || {};
-      saveInlineEdit(
-        itemIndex,
-        freshEdit.qty,
-        freshEdit.rate,
-        freshEdit.description
-      );
+      saveInlineEdit(itemIndex);
     }, 500);
   };
 
-  const saveInlineEdit = async (
-    itemIndex: number,
-    newQty?: number,
-    newRate?: number,
-    newDescription?: string
-  ) => {
+  const saveInlineEdit = async (itemIndex: number) => {
+    if (!isMountedRef.current) return;
+
     setSaveStatus('saving');
     try {
       const itemId = `item-${itemIndex}`;
+      const edit = inlineEditsRef.current[itemId];
+
+      // Only save if there are actual edits for this item
+      if (!edit) {
+        if (isMountedRef.current) {
+          setSaveStatus('saved');
+        }
+        return;
+      }
+
       const currentItem = items[itemIndex];
-      const edit = inlineEditsRef.current[itemId] || {};
+      const qty = edit.qty !== undefined ? edit.qty : currentItem.qty;
+      const rate = edit.rate !== undefined ? edit.rate : currentItem.rate;
+      const description = edit.description !== undefined ? edit.description : currentItem.description;
 
       const updatedItems = items.map((item, idx) => {
         if (idx === itemIndex) {
-          const qty = edit.qty !== undefined ? edit.qty : item.qty;
-          const rate = edit.rate !== undefined ? edit.rate : item.rate;
-          const description = edit.description !== undefined ? edit.description : item.description;
           return {
             ...item,
             qty,
@@ -295,6 +285,8 @@ export function EditLCLBOQModal({
         updated_at: new Date().toISOString(),
       });
 
+      if (!isMountedRef.current) return;
+
       setItems(updatedItems);
 
       // Clear the inline edits for this item only after successful save
@@ -306,6 +298,8 @@ export function EditLCLBOQModal({
 
       setSaveStatus('saved');
     } catch (error) {
+      if (!isMountedRef.current) return;
+
       console.error('Error saving edit:', error);
       setSaveStatus('unsaved');
       toast({
