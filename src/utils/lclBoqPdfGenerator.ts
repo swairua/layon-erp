@@ -30,6 +30,7 @@ function flattenLCLBOQItems(data: LCLHierarchicalData): Array<{
   unit_of_measure?: string;
   _isSectionHeader?: boolean;
   _isSubtotal?: boolean;
+  _isSectionTotal?: boolean;
 }> {
   const flatItems: Array<{
     description: string;
@@ -39,6 +40,7 @@ function flattenLCLBOQItems(data: LCLHierarchicalData): Array<{
     unit_of_measure?: string;
     _isSectionHeader?: boolean;
     _isSubtotal?: boolean;
+    _isSectionTotal?: boolean;
   }> = [];
 
   data.sections.forEach((section, sectionIndex) => {
