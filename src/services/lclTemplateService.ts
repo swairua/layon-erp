@@ -121,12 +121,54 @@ export class LCLTemplateService {
   }
 
   async deleteItem(itemId: string): Promise<void> {
-    const { error } = await supabase
+    // Get the item to be deleted to find its section and subsection
+    const { data: itemToDelete, error: fetchError } = await supabase
+      .from('lcl_template_items')
+      .select('section_id, subsection_id')
+      .eq('id', itemId)
+      .single();
+
+    if (fetchError) throw new Error(`Failed to fetch item: ${fetchError.message}`);
+    if (!itemToDelete) throw new Error('Item not found');
+
+    // Delete the item
+    const { error: deleteError } = await supabase
       .from('lcl_template_items')
       .delete()
       .eq('id', itemId);
 
-    if (error) throw new Error(`Failed to delete item: ${error.message}`);
+    if (deleteError) throw new Error(`Failed to delete item: ${deleteError.message}`);
+
+    // Get all remaining items in the same section and subsection, ordered by sort_order
+    const { data: remainingItems, error: fetchRemainingError } = await supabase
+      .from('lcl_template_items')
+      .select('id')
+      .eq('section_id', itemToDelete.section_id)
+      .eq('subsection_id', itemToDelete.subsection_id)
+      .order('sort_order', { ascending: true });
+
+    if (fetchRemainingError) throw new Error(`Failed to fetch remaining items: ${fetchRemainingError.message}`);
+
+    // Renumber the remaining items sequentially
+    if (remainingItems && remainingItems.length > 0) {
+      const updates = remainingItems.map((item, index) => ({
+        id: item.id,
+        item_number: (index + 1).toString(),
+        sort_order: index,
+      }));
+
+      for (const update of updates) {
+        const { error: updateError } = await supabase
+          .from('lcl_template_items')
+          .update({
+            item_number: update.item_number,
+            sort_order: update.sort_order,
+          })
+          .eq('id', update.id);
+
+        if (updateError) throw new Error(`Failed to renumber items: ${updateError.message}`);
+      }
+    }
   }
 
   async getHierarchicalData(
