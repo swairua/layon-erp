@@ -450,6 +450,9 @@ export interface DocumentData {
     item_code?: string;
     section_name?: string;
     section_labor_cost?: number;
+    _isSectionHeader?: boolean;
+    _isSubtotal?: boolean;
+    _isSectionTotal?: boolean;
   }>;
   preliminaries_items?: Array<{
     item_code: string;
@@ -791,6 +794,11 @@ export const generatePDF = async (data: DocumentData) => {
   console.log('📋 Items count:', data.items?.length || 0);
   console.log('📑 Sections count:', data.sections?.length || 0);
   console.log('💰 Total amount:', data.total_amount);
+  console.error('[generatePDF] ⚠️ LCL BOQ flags CHECK:', {
+    isLCLBOQ: data.isLCLBOQ,
+    type: data.type,
+    willUseLCLBranch: data.isLCLBOQ && data.type === 'boq',
+  });
 
   // Extract theme color variables from the main document so PDFs match the app theme
   const computed = typeof window !== 'undefined' ? getComputedStyle(document.documentElement) : null;
@@ -3273,7 +3281,22 @@ export const generatePDF = async (data: DocumentData) => {
         <!-- Items Section -->
         ${data.items && data.items.length > 0 ? `
         <div class="items-section">
-          ${data.isLCLBOQ && data.type === 'boq' ? (() => {
+          ${(() => {
+            const isLCLBranch = data.isLCLBOQ && data.type === 'boq';
+            console.log('[generatePDF] Items section branch decision:', {
+              isLCLBOQ: data.isLCLBOQ,
+              type: data.type,
+              itemCount: data.items?.length,
+              isLCLBranch,
+              usingBranch: isLCLBranch ? 'LCL (table-splitting)' : 'Generic BOQ (single table)',
+            });
+            return isLCLBranch;
+          })() ? (() => {
+            console.log('[LCL BOQ] Rendering with LCL BOQ logic', {
+              isLCLBOQ: data.isLCLBOQ,
+              type: data.type,
+              itemCount: data.items?.length,
+            });
             let tableHtml = '';
             let currentTable: string[] = [];
             let isFirstTable = true;
@@ -3302,7 +3325,16 @@ export const generatePDF = async (data: DocumentData) => {
               }
             };
 
-            data.items.forEach((item) => {
+            data.items.forEach((item, idx) => {
+              if (idx < 5) {
+                console.log(`[LCL BOQ] Item ${idx}:`, {
+                  description: item.description.substring(0, 50),
+                  _isSectionHeader: (item as any)._isSectionHeader,
+                  _isSubtotal: (item as any)._isSubtotal,
+                  _isSectionTotal: (item as any)._isSectionTotal,
+                  unit_of_measure: (item as any).unit_of_measure,
+                });
+              }
               if ((item as any)._isSectionHeader) {
                 closeTable();
                 lastSectionHeader = item.description;
