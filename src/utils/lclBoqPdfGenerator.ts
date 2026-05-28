@@ -80,8 +80,8 @@ function flattenLCLBOQItems(data: LCLHierarchicalData): Array<{
 
       // Add items
       subsection.items.forEach((item: LCLItemWithCalculations) => {
-        const qty = safeN(item.qty);
-        const rate = safeN(item.rate);
+        const qty = safeN((item as any).qty) || safeN((item as any).default_qty) || 0;
+        const rate = safeN((item as any).rate) || safeN((item as any).default_rate) || 0;
         const amount = safeN(item.amount);
 
         flatItems.push({
@@ -115,7 +115,8 @@ function flattenLCLBOQItems(data: LCLHierarchicalData): Array<{
       line_total: section.total,
       unit_of_measure: undefined,
       _isSectionHeader: false,
-      _isSubtotal: true,
+      _isSubtotal: false,
+      _isSectionTotal: true,
     });
   });
 
