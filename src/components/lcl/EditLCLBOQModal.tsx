@@ -69,8 +69,8 @@ export function EditLCLBOQModal({
   const extractSections = (itemsSnapshot: ItemSnapshot[]): string[] => {
     const sectionsSet = new Set<string>();
     itemsSnapshot.forEach((item) => {
-      // Extract section letter from section_id (e.g., "section-A" -> "A")
-      const match = item.section_id?.match(/section-([A-Z])/i);
+      // Extract section letter from section_id (e.g., "section_a" -> "A")
+      const match = item.section_id?.match(/section_([a-z])/i);
       if (match) {
         sectionsSet.add(match[1].toUpperCase());
       }
@@ -80,7 +80,7 @@ export function EditLCLBOQModal({
 
   const getItemsForSection = (sectionLetter: string): ItemSnapshot[] => {
     return items.filter((item) => {
-      const match = item.section_id?.match(/section-([A-Z])/i);
+      const match = item.section_id?.match(/section_([a-z])/i);
       return match && match[1].toUpperCase() === sectionLetter;
     });
   };
