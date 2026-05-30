@@ -360,6 +360,7 @@ export const useConvertBoqToInvoice = () => {
               unit_price: item.unit_price,
               line_total: item.line_total, // This preserves the actual total with decimals
               unit_of_measure: item.unit_of_measure,
+              section_name: item.section_name || null,
               discount_percentage: 0,
               sort_order: index
             };

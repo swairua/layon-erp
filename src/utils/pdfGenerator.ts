@@ -14,12 +14,11 @@ const renderHTMLToCanvas = async (htmlContent: string, pageSelector: string) => 
     // Create a temporary wrapper for proper rendering
     wrapper = document.createElement('div');
     wrapper.style.position = 'absolute';
-    wrapper.style.left = '0';
+    wrapper.style.left = '-9999px';
     wrapper.style.top = '0';
     wrapper.style.width = '210mm';
     wrapper.style.height = 'auto';
     wrapper.style.backgroundColor = '#ffffff';
-    wrapper.style.zIndex = '-999999';
     wrapper.style.pointerEvents = 'none';
     wrapper.innerHTML = htmlContent;
 
@@ -106,12 +105,11 @@ const renderBOQSectionsToPDF = async (pdf: jsPDF, wrapper: HTMLElement, pageWidt
   // First render and add header on first page
   const headerWrapper = document.createElement('div');
   headerWrapper.style.position = 'absolute';
-  headerWrapper.style.left = '0';
+  headerWrapper.style.left = '-9999px';
   headerWrapper.style.top = '0';
   headerWrapper.style.width = '210mm';
   headerWrapper.style.height = 'auto';
   headerWrapper.style.backgroundColor = '#ffffff';
-  headerWrapper.style.zIndex = '-999999';
   headerWrapper.style.pointerEvents = 'none';
   headerWrapper.innerHTML = headerHTML;
   document.body.appendChild(headerWrapper);
@@ -145,12 +143,11 @@ const renderBOQSectionsToPDF = async (pdf: jsPDF, wrapper: HTMLElement, pageWidt
   for (const sectionBlock of sectionBlocks) {
     const sectionWrapper = document.createElement('div');
     sectionWrapper.style.position = 'absolute';
-    sectionWrapper.style.left = '0';
+    sectionWrapper.style.left = '-9999px';
     sectionWrapper.style.top = '0';
     sectionWrapper.style.width = '210mm';
     sectionWrapper.style.height = 'auto';
     sectionWrapper.style.backgroundColor = '#ffffff';
-    sectionWrapper.style.zIndex = '-999999';
     sectionWrapper.style.pointerEvents = 'none';
     sectionWrapper.innerHTML = (sectionBlock as HTMLElement).outerHTML;
     document.body.appendChild(sectionWrapper);
@@ -226,12 +223,11 @@ const convertHTMLToPDFAndDownload = async (htmlContent: string, filename: string
     // Create a temporary wrapper for proper rendering
     wrapper = document.createElement('div');
     wrapper.style.position = 'absolute';
-    wrapper.style.left = '0';
+    wrapper.style.left = '-9999px';
     wrapper.style.top = '0';
     wrapper.style.width = '210mm';
     wrapper.style.height = 'auto';
     wrapper.style.backgroundColor = '#ffffff';
-    wrapper.style.zIndex = '-999999';
     wrapper.style.pointerEvents = 'none';
     wrapper.innerHTML = htmlContent;
 
@@ -1510,12 +1506,11 @@ export const generatePDF = async (data: DocumentData) => {
       console.log('Rendering BOQ main content...');
       boqWrapper = document.createElement('div');
       boqWrapper.style.position = 'absolute';
-      boqWrapper.style.left = '0';
+      boqWrapper.style.left = '-9999px';
       boqWrapper.style.top = '0';
       boqWrapper.style.width = `${contentWidth}mm`;
       boqWrapper.style.height = 'auto';
       boqWrapper.style.backgroundColor = '#ffffff';
-      boqWrapper.style.zIndex = '-999999';
       boqWrapper.style.pointerEvents = 'none';
       boqWrapper.innerHTML = htmlContentBOQ;
 
@@ -1559,12 +1554,11 @@ export const generatePDF = async (data: DocumentData) => {
       if (headerElement) {
         const headerWrapper2 = document.createElement('div');
         headerWrapper2.style.position = 'absolute';
-        headerWrapper2.style.left = '0';
+        headerWrapper2.style.left = '-9999px';
         headerWrapper2.style.top = '0';
         headerWrapper2.style.width = '210mm';
         headerWrapper2.style.height = 'auto';
         headerWrapper2.style.backgroundColor = '#ffffff';
-        headerWrapper2.style.zIndex = '-999999';
         headerWrapper2.style.pointerEvents = 'none';
         headerWrapper2.style.overflow = 'visible';
         headerWrapper2.innerHTML = headerElement.outerHTML;
@@ -1599,12 +1593,11 @@ export const generatePDF = async (data: DocumentData) => {
       if (preliminariesElement) {
         const prelim = document.createElement('div');
         prelim.style.position = 'absolute';
-        prelim.style.left = '0';
+        prelim.style.left = '-9999px';
         prelim.style.top = '0';
         prelim.style.width = '210mm';
         prelim.style.height = 'auto';
         prelim.style.backgroundColor = '#ffffff';
-        prelim.style.zIndex = '-999999';
         prelim.style.pointerEvents = 'none';
         prelim.innerHTML = preliminariesElement.outerHTML;
         document.body.appendChild(prelim);
@@ -1665,12 +1658,11 @@ export const generatePDF = async (data: DocumentData) => {
           // Fallback: render entire section-block as one image
           const fbWrapper = document.createElement('div');
           fbWrapper.style.position = 'absolute';
-          fbWrapper.style.left = '0';
+          fbWrapper.style.left = '-9999px';
           fbWrapper.style.top = '0';
           fbWrapper.style.width = '210mm';
           fbWrapper.style.height = 'auto';
           fbWrapper.style.backgroundColor = '#ffffff';
-          fbWrapper.style.zIndex = '-999999';
           fbWrapper.style.pointerEvents = 'none';
           fbWrapper.innerHTML = (sectionBlock as HTMLElement).outerHTML;
           document.body.appendChild(fbWrapper);
@@ -1750,12 +1742,11 @@ export const generatePDF = async (data: DocumentData) => {
 
           const sliceWrapper = document.createElement('div');
           sliceWrapper.style.position = 'absolute';
-          sliceWrapper.style.left = '0';
+          sliceWrapper.style.left = '-9999px';
           sliceWrapper.style.top = '0';
           sliceWrapper.style.width = '210mm';
           sliceWrapper.style.height = 'auto';
           sliceWrapper.style.backgroundColor = '#ffffff';
-          sliceWrapper.style.zIndex = '-999999';
           sliceWrapper.style.pointerEvents = 'none';
           sliceWrapper.innerHTML = sliceHtml;
           document.body.appendChild(sliceWrapper);
@@ -1787,12 +1778,11 @@ export const generatePDF = async (data: DocumentData) => {
       if (totalsElement) {
         const totalsWrapper2 = document.createElement('div');
         totalsWrapper2.style.position = 'absolute';
-        totalsWrapper2.style.left = '0';
+        totalsWrapper2.style.left = '-9999px';
         totalsWrapper2.style.top = '0';
         totalsWrapper2.style.width = '210mm';
         totalsWrapper2.style.height = 'auto';
         totalsWrapper2.style.backgroundColor = '#ffffff';
-        totalsWrapper2.style.zIndex = '-999999';
         totalsWrapper2.style.pointerEvents = 'none';
         totalsWrapper2.innerHTML = totalsElement.outerHTML;
         document.body.appendChild(totalsWrapper2);
@@ -1944,16 +1934,15 @@ export const generatePDF = async (data: DocumentData) => {
     const renderPageSection = async (htmlContent: string): Promise<void> => {
       let wrapper: HTMLElement | null = null;
       try {
-        wrapper = document.createElement('div');
-        wrapper.style.position = 'absolute';
-        wrapper.style.left = '0';
-        wrapper.style.top = '0';
-        wrapper.style.width = '210mm';
-        wrapper.style.height = 'auto';
-        wrapper.style.backgroundColor = '#ffffff';
-        wrapper.style.zIndex = '-999999';
-        wrapper.style.pointerEvents = 'none';
-        wrapper.innerHTML = htmlContent;
+    wrapper = document.createElement('div');
+    wrapper.style.position = 'absolute';
+    wrapper.style.left = '-9999px';
+    wrapper.style.top = '0';
+    wrapper.style.width = '210mm';
+    wrapper.style.height = 'auto';
+    wrapper.style.backgroundColor = '#ffffff';
+    wrapper.style.pointerEvents = 'none';
+    wrapper.innerHTML = htmlContent;
 
         document.body.appendChild(wrapper);
         await new Promise(resolve => setTimeout(resolve, 3000));

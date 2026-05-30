@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { lclBoqService, LCLBOQRecord } from '@/services/lclBoqService';
-import { CheckCircle2, AlertCircle, Download } from 'lucide-react';
+import { AlertCircle, ChevronRight, Download } from 'lucide-react';
 import { useCurrentCompany } from '@/contexts/CompanyContext';
 import { useCustomers } from '@/hooks/useDatabase';
 import { downloadLCLBOQPDF } from '@/utils/lclBoqPdfGenerator';
@@ -63,9 +63,21 @@ export function EditLCLBOQModal({
   const [inlineEdits, setInlineEdits] = useState<{ [itemId: string]: InlineEdit }>({});
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'unsaved' | 'saving' | null>(null);
-  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState(false);
   const inlineEditsRef = useRef<{ [itemId: string]: InlineEdit }>({});
+
+  const toggleSection = (letter: string) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(letter)) {
+        next.delete(letter);
+      } else {
+        next.add(letter);
+      }
+      return next;
+    });
+  };
   const { toast } = useToast();
   const { currentCompany } = useCurrentCompany();
   const { data: customers } = useCustomers(currentCompany?.id || '');
@@ -108,16 +120,6 @@ export function EditLCLBOQModal({
       const match = item.section_id?.match(/section_([a-z])/i);
       return match && match[1].toUpperCase() === sectionLetter;
     });
-  };
-
-  const getSectionName = (sectionLetter: string): string => {
-    const sectionItem = items.find((item) => {
-      const match = item.section_id?.match(/section_([a-z])/i);
-      return match && match[1].toUpperCase() === sectionLetter;
-    });
-    // Use section_name from snapshot, or fallback to template, or use generic name
-    const name = sectionItem?.section_name || getSectionNameFromTemplate(sectionItem?.section_id);
-    return name ? `SECTION ${sectionLetter}: ${name}` : `SECTION ${sectionLetter}`;
   };
 
   const reconstructHierarchicalData = (): LCLHierarchicalData => {
@@ -190,9 +192,7 @@ export function EditLCLBOQModal({
       setInlineEdits({});
       inlineEditsRef.current = {};
       const sections = extractSections(boq.items_snapshot);
-      if (sections.length > 0) {
-        setActiveSection(sections[0].letter);
-      }
+      setExpandedSections(new Set(sections.map((s) => s.letter)));
     }
   }, [isOpen, boq]);
 
@@ -200,22 +200,6 @@ export function EditLCLBOQModal({
     inlineEditsRef.current = inlineEdits;
   }, [inlineEdits]);
 
-
-  const getItemAmount = (item: ItemSnapshot, itemIndex: number): number => {
-    const itemId = `item-${itemIndex}`;
-    const edit = inlineEdits[itemId];
-    const qty = edit?.qty !== undefined ? edit.qty : item.qty;
-    const rate = edit?.rate !== undefined ? edit.rate : item.rate;
-    return qty * rate;
-  };
-
-  const calculateTotals = () => {
-    let subtotal = 0;
-    items.forEach((item, index) => {
-      subtotal += getItemAmount(item, index);
-    });
-    return subtotal;
-  };
 
   const handleQtyChange = (itemIndex: number, value: string) => {
     const qty = value === '' ? 0 : parseFloat(value);
@@ -359,6 +343,7 @@ export function EditLCLBOQModal({
 
       setItems(updatedItems);
       setInlineEdits({});
+      setSaveStatus(null);
       inlineEditsRef.current = {};
 
       toast({
@@ -382,7 +367,6 @@ export function EditLCLBOQModal({
   };
 
   const sections = extractSections(items);
-  const currentSectionItems = activeSection ? getItemsForSection(activeSection) : [];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -391,16 +375,9 @@ export function EditLCLBOQModal({
           <div className="flex items-center justify-between">
             <div>
               <DialogTitle>Edit LCL BOQ - {boq.number}</DialogTitle>
-              {activeSection && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  {getSectionName(activeSection)}
-                </p>
-              )}
-              {boq.id && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  editng LCL id {boq.id}
-                </p>
-              )}
+              <p className="text-sm text-muted-foreground mt-1">
+                {sections.length} section{sections.length !== 1 ? 's' : ''} &mdash; click to expand/collapse
+              </p>
             </div>
             <Button
               size="sm"
@@ -417,126 +394,163 @@ export function EditLCLBOQModal({
           </DialogDescription>
         </DialogHeader>
 
-        {sections.length > 0 && (
-          <div className="flex gap-2 border-b pb-2 overflow-x-auto">
-            {sections.map((section) => (
-              <button
-                key={section.letter}
-                onClick={() => setActiveSection(section.letter)}
-                className={`px-3 py-2 text-sm font-medium rounded-t border-b-2 transition-colors whitespace-nowrap ${
-                  activeSection === section.letter
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {section.name ? `${section.letter}: ${section.name}` : `SECTION ${section.letter}`}
-              </button>
-            ))}
+        {saveStatus === 'unsaved' && (
+          <div className="flex items-center gap-2 p-3 rounded text-sm bg-yellow-50 text-yellow-900 mb-4">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>Unsaved changes</span>
           </div>
         )}
 
         <div className="space-y-4">
-          {saveStatus === 'unsaved' && (
-            <div className="flex items-center gap-2 p-3 rounded text-sm bg-yellow-50 text-yellow-900">
-              <AlertCircle className="h-4 w-4" />
-              <span>Unsaved changes</span>
-            </div>
-          )}
+          {sections.map((sectionObj) => {
+            const sectionLetter = sectionObj.letter;
+            const sectionItems = getItemsForSection(sectionLetter);
+            const isExpanded = expandedSections.has(sectionLetter);
 
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-1/3">Description</TableHead>
-                  <TableHead className="w-20">Unit</TableHead>
-                  <TableHead className="w-24">Qty</TableHead>
-                  <TableHead className="w-24">Rate</TableHead>
-                  <TableHead className="w-24 text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {currentSectionItems.map((item, sectionIndex) => {
-                  const fullIndex = items.findIndex(
-                    (i) =>
-                      i.item_number === item.item_number &&
-                      i.description === item.description
-                  );
-                  const itemId = `item-${fullIndex}`;
-                  const edit = inlineEdits[itemId];
-                  const qty = edit?.qty !== undefined ? edit.qty : item.qty;
-                  const rate = edit?.rate !== undefined ? edit.rate : item.rate;
-                  const amount = qty * rate;
+            // Build subsection map
+            const subsectionsMap = new Map<string, ItemSnapshot[]>();
+            sectionItems.forEach((item) => {
+              if (!subsectionsMap.has(item.subsection_id)) {
+                subsectionsMap.set(item.subsection_id, []);
+              }
+              subsectionsMap.get(item.subsection_id)?.push(item);
+            });
 
-                  return (
-                    <TableRow key={sectionIndex}>
-                      <TableCell>
-                        <Input
-                          value={edit?.description !== undefined ? edit.description : item.description}
-                          onChange={(e) => handleDescriptionChange(fullIndex, e.target.value)}
-                          className="text-sm"
-                        />
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {item.unit}
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={qty.toString()}
-                          onChange={(e) => handleQtyChange(fullIndex, e.target.value)}
-                          className="text-sm"
-                          step="0.01"
-                          min="0"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={rate.toString()}
-                          onChange={(e) => handleRateChange(fullIndex, e.target.value)}
-                          className="text-sm"
-                          step="0.01"
-                          min="0"
-                        />
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-sm">
-                        {amount.toFixed(2)}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+            // Pre-compute item amounts with inline edits for all items in this section
+            const getInlineItem = (item: ItemSnapshot) => {
+              const fullIndex = items.findIndex(
+                (i) => i.item_number === item.item_number && i.description === item.description
+              );
+              const itemId = `item-${fullIndex}`;
+              const edit = inlineEdits[itemId];
+              const qty = edit?.qty !== undefined ? edit.qty : item.qty;
+              const rate = edit?.rate !== undefined ? edit.rate : item.rate;
+              const amount = qty * rate;
+              return { item, fullIndex, itemId, edit, qty, rate, amount };
+            };
 
-          {activeSection && (
-            <div className="flex justify-end border-t pt-4">
-              <div className="text-right">
-                <div className="text-sm text-muted-foreground mb-2">
-                  {getSectionName(activeSection)} Total
-                </div>
-                <div className="text-2xl font-bold">
-                  {currentSectionItems
-                    .reduce((sum, item, idx) => {
-                      const fullIndex = items.findIndex(
-                        (i) =>
-                          i.item_number === item.item_number &&
-                          i.description === item.description
-                      );
-                      const itemId = `item-${fullIndex}`;
-                      const edit = inlineEdits[itemId];
-                      const qty = edit?.qty !== undefined ? edit.qty : item.qty;
-                      const rate = edit?.rate !== undefined ? edit.rate : item.rate;
-                      return sum + qty * rate;
-                    }, 0)
-                    .toFixed(2)}
-                </div>
+            let sectionTotal = 0;
+            const subsectionEntries = Array.from(subsectionsMap.entries()).map(([ssId, ssItems]) => {
+              let subsectionName = '';
+              let subtotal = 0;
+              const itemsWithAmount = ssItems.map((item) => {
+                const ia = getInlineItem(item);
+                if (!subsectionName && item.subsection_name) {
+                  subsectionName = item.subsection_name;
+                }
+                subtotal += ia.amount;
+                return ia;
+              });
+              sectionTotal += subtotal;
+              return { subsectionId: ssId, subsectionName, itemsWithAmount, subtotal };
+            });
+
+            return (
+              <div key={sectionLetter} className="border border-border rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => toggleSection(sectionLetter)}
+                  className="w-full flex items-center justify-between gap-4 px-4 py-3 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <ChevronRight
+                      className={`h-4 w-4 shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                    />
+                    <span className="font-semibold text-sm truncate">
+                      {sectionObj.name ? `SECTION ${sectionLetter}: ${sectionObj.name}` : `SECTION ${sectionLetter}`}
+                    </span>
+                  </div>
+                  <span className="text-sm font-medium tabular-nums shrink-0">
+                    {sectionTotal.toFixed(2)}
+                  </span>
+                </button>
+
+                {isExpanded && (
+                  <div className="border-t px-4 pb-4">
+                    {subsectionEntries.map((entry) => (
+                      <div key={entry.subsectionId} className="mt-4">
+                        <div className="text-sm font-medium text-muted-foreground mb-2">
+                          &rarr; {entry.subsectionName || entry.subsectionId}
+                        </div>
+                        <div className="border rounded-lg overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-1/3">Description</TableHead>
+                                <TableHead className="w-20">Unit</TableHead>
+                                <TableHead className="w-24">Qty</TableHead>
+                                <TableHead className="w-24">Rate</TableHead>
+                                <TableHead className="w-24 text-right">Amount</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {entry.itemsWithAmount.map((ia, idx) => (
+                                <TableRow key={idx}>
+                                  <TableCell>
+                                    <Input
+                                      value={ia.edit?.description !== undefined ? ia.edit.description : ia.item.description}
+                                      onChange={(e) => handleDescriptionChange(ia.fullIndex, e.target.value)}
+                                      className="text-sm"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-sm text-muted-foreground">
+                                    {ia.item.unit}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      type="number"
+                                      value={ia.qty.toString()}
+                                      onChange={(e) => handleQtyChange(ia.fullIndex, e.target.value)}
+                                      className="text-sm"
+                                      step="0.01"
+                                      min="0"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      type="number"
+                                      value={ia.rate.toString()}
+                                      onChange={(e) => handleRateChange(ia.fullIndex, e.target.value)}
+                                      className="text-sm"
+                                      step="0.01"
+                                      min="0"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-right font-medium text-sm tabular-nums">
+                                    {ia.amount.toFixed(2)}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                              <TableRow className="bg-muted/30">
+                                <TableCell colSpan={4} className="text-right text-sm font-medium text-muted-foreground">
+                                  Subtotal
+                                </TableCell>
+                                <TableCell className="text-right font-medium text-sm tabular-nums">
+                                  {entry.subtotal.toFixed(2)}
+                                </TableCell>
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    ))}
+
+                    <div className="flex justify-end mt-4 pt-2 border-t">
+                      <div className="text-right">
+                        <div className="text-sm text-muted-foreground">Section Total</div>
+                        <div className="text-lg font-bold tabular-nums">
+                          {sectionTotal.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="mt-6">
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>

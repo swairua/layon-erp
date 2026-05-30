@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentCompany } from '@/contexts/CompanyContext';
 import { useCustomers } from '@/hooks/useDatabase';
-import { LCLTemplateEditor } from '@/components/lclTemplate/LCLTemplateEditor';
 import { lclTemplateService } from '@/services/lclTemplateService';
 import { LCLHierarchicalData } from '@/types/lclTemplate';
+import { LCLBOQItemEditor, LCLBOQItemEditorHandle } from '@/components/lcl/LCLBOQItemEditor';
 import { lclBoqService, LCLBOQRecord } from '@/services/lclBoqService';
 import { generateNextBOQNumber } from '@/utils/boqNumberGenerator';
-import { downloadLCLBOQPDF } from '@/utils/lclBoqPdfGenerator';
+import { downloadLCLBOQPDF, reconstructHierarchicalDataFromSnapshot } from '@/utils/lclBoqPdfGenerator';
 import {
   Select,
   SelectContent,
@@ -38,6 +38,7 @@ export default function LCLTemplate() {
   const [boqNumber, setBoqNumber] = useState<string>('');
   const [boqDate, setBoqDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [lclBoqRecord, setLclBoqRecord] = useState<LCLBOQRecord | null>(null);
+  const editorRef = useRef<LCLBOQItemEditorHandle>(null);
 
   const loadLCLBOQData = async () => {
     if (!companyId) return;
@@ -90,36 +91,18 @@ export default function LCLTemplate() {
     }
   };
 
-  const handleDataUpdated = async () => {
-    // Reload the data after any updates
-    if (!companyId) return;
-
-    try {
-      const structures = await lclTemplateService.getStructures(companyId);
-      const lclDefaultStructure = structures.find(
-        (s) => s.name === 'LCL Default BOQ'
-      );
-
-      if (lclDefaultStructure) {
-        const data = await lclTemplateService.getHierarchicalData(
-          lclDefaultStructure.id
-        );
-        setHierarchicalData(data);
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description:
-          error instanceof Error
-            ? error.message
-            : 'Failed to refresh data',
-        variant: 'destructive',
-      });
-    }
-  };
-
   const handleSaveLCLBOQ = async () => {
     if (!hierarchicalData || !companyId) return;
+
+    const itemsSnapshot = editorRef.current?.getSnapshot();
+    if (!itemsSnapshot || itemsSnapshot.length === 0) {
+      toast({
+        title: 'Validation Error',
+        description: 'No items in the BOQ. Please add items before saving.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     const selectedCustomer = customers?.find((c) => c.id === selectedCustomerId);
     if (!selectedCustomerId || !selectedCustomer) {
@@ -142,27 +125,6 @@ export default function LCLTemplate() {
 
     setSaving(true);
     try {
-      // Flatten items snapshot
-      const itemsSnapshot: any[] = [];
-      hierarchicalData.sections.forEach((section) => {
-        section.subsections.forEach((subsection) => {
-          subsection.items.forEach((item) => {
-            itemsSnapshot.push({
-              section_id: section.section_id,
-              section_name: section.section_name,
-              subsection_id: subsection.subsection_id,
-              subsection_name: subsection.subsection_name,
-              item_number: item.item_number,
-              description: item.description,
-              unit: item.unit,
-              qty: item.default_qty || 0,
-              rate: item.default_rate || 0,
-              amount: item.amount,
-            });
-          });
-        });
-      });
-
       const boqData: LCLBOQRecord = {
         id: lclBoqRecord?.id,
         company_id: companyId,
@@ -177,6 +139,7 @@ export default function LCLTemplate() {
       // Save to lcl_boqs table
       const saved = await lclBoqService.saveLCLBOQ(boqData);
       setLclBoqRecord(saved);
+      editorRef.current?.markAsSaved();
 
       // Create or update corresponding BOQ record in boqs table
       try {
@@ -253,10 +216,21 @@ export default function LCLTemplate() {
       return;
     }
 
+    const itemsSnapshot = editorRef.current?.getSnapshot();
+    if (!itemsSnapshot || itemsSnapshot.length === 0) {
+      toast({
+        title: 'Validation Error',
+        description: 'No items in the BOQ. Please add items before downloading.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setDownloading(true);
     try {
+      const pdfData = reconstructHierarchicalDataFromSnapshot(itemsSnapshot);
       await downloadLCLBOQPDF(
-        hierarchicalData,
+        pdfData,
         boqNumber,
         boqDate,
         selectedCustomer.name,
@@ -395,10 +369,10 @@ export default function LCLTemplate() {
         </div>
       </div>
 
-      <LCLTemplateEditor
+      <LCLBOQItemEditor
+        ref={editorRef}
         data={hierarchicalData}
-        onDataUpdated={handleDataUpdated}
-        companyId={companyId}
+        templateStructure={undefined}
       />
     </div>
   );

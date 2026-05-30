@@ -1,5 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { BOQData } from '@/utils/boqHelper';
+import { reconstructHierarchicalDataFromSnapshot } from '@/utils/lclBoqPdfGenerator';
+import { generateUniqueInvoiceNumber } from '@/utils/invoiceNumberGenerator';
 
 export interface LCLBOQRecord {
   id?: string;
@@ -240,3 +242,213 @@ class LCLBOQService {
 }
 
 export const lclBoqService = new LCLBOQService();
+
+function safeN(v: number | undefined | null): number {
+  return typeof v === 'number' && !isNaN(v) ? v : 0;
+}
+
+function generateCustomerCode(name: string): string {
+  const alphaOnly = name.replace(/[^A-Za-z]/g, '');
+  let prefix = alphaOnly.substring(0, 3).toUpperCase() || 'CUS';
+  prefix = prefix.padEnd(3, 'X').substring(0, 3);
+  const randomNum = Math.floor(1000 + Math.random() * 9000);
+  const timestamp = Date.now().toString().slice(-4);
+  return `${prefix}${randomNum}${timestamp}`.substring(0, 50);
+}
+
+export async function convertLCLBOQToInvoice(params: {
+  boqId: string;
+  companyId: string;
+}): Promise<{ id: string; invoice_number: string }> {
+  const { boqId, companyId } = params;
+
+  // 1. Fetch BOQ record
+  const { data: boq, error: boqError } = await supabase
+    .from('boqs')
+    .select('*')
+    .eq('id', boqId)
+    .eq('company_id', companyId)
+    .single();
+
+  if (boqError || !boq) {
+    throw new Error(`Failed to fetch BOQ: ${boqError?.message || 'Not found'}`);
+  }
+
+  if (boq.converted_to_invoice_id) {
+    throw new Error('BOQ has already been converted to an invoice');
+  }
+
+  // 2. Fetch LCL BOQ record
+  const { data: lclBoq, error: lclError } = await supabase
+    .from('lcl_boqs')
+    .select('*')
+    .eq('boq_id', boqId)
+    .single();
+
+  if (lclError || !lclBoq) {
+    throw new Error(`Failed to fetch LCL BOQ: ${lclError?.message || 'Not found'}`);
+  }
+
+  // 3. Reconstruct hierarchical data from snapshot
+  if (!lclBoq.items_snapshot || !Array.isArray(lclBoq.items_snapshot) || lclBoq.items_snapshot.length === 0) {
+    throw new Error('LCL BOQ has no items in snapshot');
+  }
+
+  const hierarchicalData = reconstructHierarchicalDataFromSnapshot(lclBoq.items_snapshot);
+
+  // 4. Find/create customer
+  let customerId: string | null = null;
+  const clientName = boq.client_name || 'Unknown Client';
+
+  const { data: existingCustomers } = await supabase
+    .from('customers')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('name', clientName)
+    .limit(1);
+
+  if (existingCustomers && existingCustomers.length > 0) {
+    customerId = existingCustomers[0].id;
+  } else {
+    const customerPayload = {
+      company_id: companyId,
+      name: clientName,
+      customer_code: generateCustomerCode(clientName),
+      email: boq.client_email || null,
+      phone: boq.client_phone || null,
+      address: boq.client_address || null,
+      city: boq.client_city || null,
+      country: boq.client_country || null,
+      is_active: true,
+    };
+
+    const { data: newCustomer, error: customerError } = await supabase
+      .from('customers')
+      .insert([customerPayload])
+      .select()
+      .single();
+
+    if (!customerError && newCustomer) {
+      customerId = newCustomer.id;
+    }
+  }
+
+  // 5. Generate invoice number
+  const invoiceNumber = await generateUniqueInvoiceNumber(companyId);
+
+  // 6. Get current user
+  let createdBy: string | null = null;
+  try {
+    const { data: userData } = await supabase.auth.getUser();
+    createdBy = userData?.user?.id || null;
+  } catch {
+    createdBy = null;
+  }
+
+  // 7. Flatten hierarchy into invoice items
+  const invoiceItems: Array<{
+    description: string;
+    quantity: number;
+    unit_price: number;
+    line_total: number;
+    unit_of_measure: string;
+    section_name: string;
+  }> = [];
+
+  let subtotal = 0;
+
+  hierarchicalData.sections.forEach((section) => {
+    section.subsections.forEach((subsection) => {
+      subsection.items.forEach((item) => {
+        const qty = safeN((item as any).qty);
+        const rate = safeN((item as any).rate);
+        const amount = safeN((item as any).amount) || qty * rate;
+        if (qty > 0 || rate > 0) {
+          invoiceItems.push({
+            description: item.description || '',
+            quantity: Math.round(qty),
+            unit_price: rate,
+            line_total: amount,
+            unit_of_measure: item.unit || 'Item',
+            section_name: `${section.section_name} - ${subsection.subsection_name}`,
+          });
+          subtotal += amount;
+        }
+      });
+    });
+  });
+
+  if (invoiceItems.length === 0) {
+    throw new Error('LCL BOQ has no items with quantity or rate. Cannot convert.');
+  }
+
+  // 8. Create invoice
+  const totalAmount = subtotal;
+
+  const { data: invoice, error: invoiceError } = await supabase
+    .from('invoices')
+    .insert([
+      {
+        company_id: companyId,
+        customer_id: customerId,
+        invoice_number: invoiceNumber,
+        invoice_date: new Date().toISOString().split('T')[0],
+        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        status: 'draft',
+        subtotal,
+        tax_amount: 0,
+        total_amount: totalAmount,
+        currency: boq.currency || 'KES',
+        notes: `Converted from LCL BOQ ${boq.number}`,
+        terms_and_conditions: boq.terms_and_conditions || null,
+        created_by: createdBy,
+        balance_due: totalAmount,
+        paid_amount: 0,
+      },
+    ])
+    .select()
+    .single();
+
+  if (invoiceError || !invoice) {
+    throw new Error(`Failed to create invoice: ${invoiceError?.message || 'Unknown error'}`);
+  }
+
+  // 9. Insert invoice items with section_name
+  const itemsToInsert = invoiceItems.map((item, index) => ({
+    invoice_id: invoice.id,
+    product_id: null,
+    description: item.description,
+    quantity: item.quantity,
+    unit_price: item.unit_price,
+    line_total: item.line_total,
+    unit_of_measure: item.unit_of_measure,
+    section_name: item.section_name,
+    discount_percentage: 0,
+    sort_order: index,
+  }));
+
+  const { error: itemsError } = await supabase.from('invoice_items').insert(itemsToInsert);
+
+  if (itemsError) {
+    // Clean up invoice if items fail
+    await supabase.from('invoices').delete().eq('id', invoice.id);
+    throw new Error(`Failed to create invoice items: ${itemsError?.message || 'Unknown error'}`);
+  }
+
+  // 10. Mark BOQ as converted
+  const { error: updateError } = await supabase
+    .from('boqs')
+    .update({
+      converted_to_invoice_id: invoice.id,
+      converted_at: new Date().toISOString(),
+      status: 'converted',
+    })
+    .eq('id', boqId)
+    .eq('company_id', companyId);
+
+  if (updateError) {
+    console.error('Failed to mark BOQ as converted:', updateError);
+  }
+
+  return { id: invoice.id, invoice_number: invoice.invoice_number };
+}

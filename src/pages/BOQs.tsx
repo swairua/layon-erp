@@ -23,6 +23,7 @@ import { useBOQs, useUnits } from '@/hooks/useDatabase';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { useAuditedDeleteOperations } from '@/hooks/useAuditedDeleteOperations';
 import { useConvertBoqToInvoice } from '@/hooks/useBOQ';
+import { convertLCLBOQToInvoice } from '@/services/lclBoqService';
 import { loadBoqDraft, deleteDraft, cleanupDuplicateDrafts } from '@/services/boqAutoSaveService';
 import { generateUniqueInvoiceNumber } from '@/utils/invoiceNumberGenerator';
 import { toast } from 'sonner';
@@ -56,7 +57,7 @@ export default function BOQs() {
   const [viewing, setViewing] = useState<any | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; boqId?: string; boqNumber?: string }>({ open: false });
-  const [convertDialog, setConvertDialog] = useState<{ open: boolean; boqId?: string; boqNumber?: string }>({ open: false });
+  const [convertDialog, setConvertDialog] = useState<{ open: boolean; boqId?: string; boqNumber?: string; isLCL?: boolean }>({ open: false });
   const [draftExists, setDraftExists] = useState(false);
   const [draftLastSaved, setDraftLastSaved] = useState<string | null>(null);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
@@ -354,15 +355,18 @@ export default function BOQs() {
     }
   };
 
-  const handleConvertClick = (id: string, number: string) => {
-    setConvertDialog({ open: true, boqId: id, boqNumber: number });
+  const handleConvertClick = (id: string, number: string, isLCL: boolean = false) => {
+    setConvertDialog({ open: true, boqId: id, boqNumber: number, isLCL });
   };
 
   const handleConvertConfirm = async () => {
     if (!convertDialog.boqId || !companyId) return;
     try {
       toast.loading(`Converting BOQ ${convertDialog.boqNumber} to invoice...`);
-      const invoice = await convertToInvoice.mutateAsync({ boqId: convertDialog.boqId, companyId });
+      const isLCL = convertDialog.isLCL;
+      const invoice = isLCL
+        ? await convertLCLBOQToInvoice({ boqId: convertDialog.boqId, companyId })
+        : await convertToInvoice.mutateAsync({ boqId: convertDialog.boqId, companyId });
 
       toast.dismiss();
 
@@ -779,9 +783,9 @@ export default function BOQs() {
                             <Button
                               size="icon"
                               variant="outline"
-                              onClick={() => handleConvertClick(b.id, b.number)}
+                              onClick={() => handleConvertClick(b.id, b.number, linkedBOQIds.has(b.id))}
                               title="Convert to Invoice"
-                              disabled={b.converted_to_invoice_id !== null && b.converted_to_invoice_id !== undefined || linkedBOQIds.has(b.id)}
+                              disabled={b.converted_to_invoice_id !== null && b.converted_to_invoice_id !== undefined}
                               className="h-8 w-8 md:h-9 md:w-9"
                             >
                               <FileText className="h-3 w-3 md:h-4 md:w-4" />
@@ -1013,13 +1017,11 @@ export default function BOQs() {
 
       <ConfirmationDialog
         open={convertDialog.open}
-        title="Convert BOQ to Invoice"
-        description={`Convert BOQ ${convertDialog.boqNumber} to an invoice? This will create a new draft invoice with all items from this BOQ. The BOQ will be marked as converted.`}
+        title={`Convert ${convertDialog.isLCL ? 'LCL ' : ''}BOQ to Invoice`}
+        description={`Convert ${convertDialog.isLCL ? 'LCL ' : ''}BOQ ${convertDialog.boqNumber} to an invoice? This will create a new draft invoice with all items from this BOQ. The BOQ will be marked as converted.`}
         onConfirm={handleConvertConfirm}
         onCancel={() => setConvertDialog({ open: false })}
         confirmText="Convert to Invoice"
-        isLoading={convertToInvoice.isPending}
-        loadingText="Converting..."
         isDangerous={false}
       />
 
