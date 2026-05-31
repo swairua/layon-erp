@@ -332,11 +332,9 @@ export function LCLTemplateEditor({
 
   // Mark as unsaved when user makes new edits, clear when all saved
   useEffect(() => {
-    if (Object.keys(inlineEdits).length > 0) {
-      setHasUnsavedChanges(true);
-    } else {
-      setHasUnsavedChanges(false);
-    }
+    const hasEdits = Object.keys(inlineEdits).length > 0;
+    console.log('[LCLEditor] inlineEdits changed, hasEdits:', hasEdits, 'inlineEdits:', inlineEdits);
+    setHasUnsavedChanges(hasEdits);
   }, [inlineEdits]);
 
   // Load draft from localStorage on mount
