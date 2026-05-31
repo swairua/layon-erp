@@ -217,12 +217,15 @@ export function LCLTemplateEditor({
 
       // Save first edit to localStorage immediately for recovery
       if (Object.keys(prev).length === 0) {
+        console.log(`[EDIT] First edit added - itemId: ${itemId}, qty: ${qty}, setting hasUnsavedChanges=true`);
         setHasUnsavedChanges(true);
         try {
           saveDraftToLocalStorage(data.structure_id, newEdits);
         } catch (error) {
           console.error('Failed to save first edit:', error);
         }
+      } else {
+        console.log(`[EDIT] Qty changed - itemId: ${itemId}, qty: ${qty}, total edits: ${Object.keys(prev).length}`);
       }
 
       // Debounce save - read both qty and rate from latest ref when timer executes
@@ -231,6 +234,7 @@ export function LCLTemplateEditor({
       }
 
       debounceTimers.current[itemId] = setTimeout(() => {
+        console.log(`[DEBOUNCE] Timer fired for itemId: ${itemId}`);
         const latestQty = latestInlineEditsRef.current[itemId]?.qty ?? qty;
         const latestRate = latestInlineEditsRef.current[itemId]?.rate;
         saveInlineEdit(itemId, latestQty, latestRate);
@@ -252,12 +256,15 @@ export function LCLTemplateEditor({
 
       // Save first edit to localStorage immediately for recovery
       if (Object.keys(prev).length === 0) {
+        console.log(`[EDIT] First edit added - itemId: ${itemId}, rate: ${rate}, setting hasUnsavedChanges=true`);
         setHasUnsavedChanges(true);
         try {
           saveDraftToLocalStorage(data.structure_id, newEdits);
         } catch (error) {
           console.error('Failed to save first edit:', error);
         }
+      } else {
+        console.log(`[EDIT] Rate changed - itemId: ${itemId}, rate: ${rate}, total edits: ${Object.keys(prev).length}`);
       }
 
       // Debounce save - read both qty and rate from latest ref when timer executes
@@ -266,6 +273,7 @@ export function LCLTemplateEditor({
       }
 
       debounceTimers.current[itemId] = setTimeout(() => {
+        console.log(`[DEBOUNCE] Timer fired for itemId: ${itemId}`);
         const latestQty = latestInlineEditsRef.current[itemId]?.qty;
         const latestRate = latestInlineEditsRef.current[itemId]?.rate ?? rate;
         saveInlineEdit(itemId, latestQty, latestRate);
@@ -276,6 +284,7 @@ export function LCLTemplateEditor({
   };
 
   const saveInlineEdit = async (itemId: string, newQty?: number, newRate?: number) => {
+    console.log(`[SAVE] saveInlineEdit starting for itemId: ${itemId}, newQty: ${newQty}, newRate: ${newRate}`);
     try {
       const edit = inlineEdits[itemId];
       const qtyToSave = newQty !== undefined ? newQty : edit?.qty;
@@ -294,7 +303,10 @@ export function LCLTemplateEditor({
         if (currentItem) break;
       }
 
-      if (!currentItem) return;
+      if (!currentItem) {
+        console.log(`[SAVE] Item not found: ${itemId}`);
+        return;
+      }
 
       await lclTemplateService.updateItem(itemId, {
         description: currentItem.description,
@@ -303,13 +315,17 @@ export function LCLTemplateEditor({
         default_rate: rateToSave !== undefined ? rateToSave : currentItem.default_rate,
       });
 
+      console.log(`[SAVE] Database save completed for itemId: ${itemId}`);
+
       // Clear the inline edit after successful save
       setInlineEdits((prev) => {
         const updated = { ...prev };
         delete updated[itemId];
+        console.log(`[SAVE] Removing edit from state for itemId: ${itemId}, remaining edits: ${Object.keys(updated).length}`);
 
         // Clear draft if no more unsaved edits
         if (Object.keys(updated).length === 0) {
+          console.log(`[SAVE] No more edits, clearing draft and setting hasUnsavedChanges=false`);
           clearDraftFromLocalStorage(data.structure_id);
           setHasUnsavedChanges(false);
           setLastSavedTime(new Date().toISOString());
@@ -320,6 +336,7 @@ export function LCLTemplateEditor({
 
       await onDataUpdated();
     } catch (error) {
+      console.error(`[SAVE] Error saving itemId: ${itemId}`, error);
       toast({
         title: 'Error',
         description:
