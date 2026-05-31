@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { User, Session, AuthError } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { User, Session, AuthError, createClient } from '@supabase/supabase-js';
+import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from '@/integrations/supabase/client';
 import { toast } from '@/utils/safeToast';
 import { initializeAuth, clearAuthTokens, safeAuthOperation } from '@/utils/authHelpers';
 import { logError, getUserFriendlyErrorMessage, isErrorType } from '@/utils/errorLogger';
@@ -64,6 +64,7 @@ export interface AuthContextType {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ error: Error | null }>;
+  changeOwnPassword: (oldPassword: string, newPassword: string) => Promise<{ error: Error | null }>;
   changeUserPassword: (userId: string, newPassword: string) => Promise<{ error: Error | null }>;
   isAuthenticated: boolean;
   isAdmin: boolean;
@@ -737,6 +738,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [user]);
 
+  const changeOwnPassword = useCallback(async (oldPassword: string, newPassword: string) => {
+    if (!user?.email) {
+      return { error: new Error('No authenticated user found. Please sign in again.') };
+    }
+
+    try {
+      const tempClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+      const { error: signInError } = await tempClient.auth.signInWithPassword({
+        email: user.email,
+        password: oldPassword,
+      });
+      if (signInError) {
+        setTimeout(() => toast.error('Current password is incorrect'), 0);
+        return { error: new Error('Current password is incorrect') };
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (updateError) {
+        logError('Error updating password:', updateError, { context: 'changeOwnPassword' });
+        const errorMsg = updateError.message || 'Failed to update password';
+        setTimeout(() => toast.error(`Failed to update password: ${errorMsg}`), 0);
+        return { error: new Error(errorMsg) };
+      }
+
+      setTimeout(() => toast.success('Password changed successfully'), 0);
+      return { error: null };
+    } catch (error) {
+      logError('Error changing password exception:', error, { context: 'changeOwnPassword' });
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      setTimeout(() => toast.error(`Failed to change password: ${errorMessage}`), 0);
+      return { error: error as Error };
+    }
+  }, [user]);
+
   const refreshProfile = useCallback(async () => {
     if (!user) return;
 
@@ -825,6 +862,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signOut,
     resetPassword,
     updateProfile,
+    changeOwnPassword,
     changeUserPassword,
     isAuthenticated,
     isAdmin,

@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { SignInModal } from '@/components/auth/SignInModal';
 import { ForgotPasswordModal } from '@/components/auth/ForgotPasswordModal';
+import { ProfileModal } from '@/components/profile/ProfileModal';
 
 interface HeaderProps {
   sidebarOpen?: boolean;
@@ -24,6 +25,7 @@ interface HeaderProps {
 export function Header({ sidebarOpen = false, onToggleSidebar = () => {} }: HeaderProps) {
   const { user, profile, signOut, isAuthenticated } = useAuth();
   const [authModal, setAuthModal] = useState<'signin' | 'forgot' | null>(null);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
 
   const getInitials = (name: string) => {
     return name
@@ -145,7 +147,7 @@ export function Header({ sidebarOpen = false, onToggleSidebar = () => {} }: Head
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setProfileModalOpen(true)}>
                     <User className="mr-2 h-4 w-4" />
                     Profile Settings
                   </DropdownMenuItem>
@@ -193,6 +195,11 @@ export function Header({ sidebarOpen = false, onToggleSidebar = () => {} }: Head
         open={authModal === 'forgot'}
         onOpenChange={(open) => !open && setAuthModal(null)}
         onSwitchToSignIn={() => handleAuthModalSwitch('signin')}
+      />
+
+      <ProfileModal
+        open={profileModalOpen}
+        onOpenChange={setProfileModalOpen}
       />
     </>
   );
