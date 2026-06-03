@@ -42,6 +42,7 @@ export default function LCLTemplate() {
   const headerAutosaveRef = useRef<NodeJS.Timeout | null>(null);
 
   const [initialItems, setInitialItems] = useState<ItemSnapshot[]>([]);
+  const [structureId, setStructureId] = useState<string>('');
 
   const loadLCLBOQData = async () => {
     if (!companyId) return;
@@ -69,6 +70,7 @@ export default function LCLTemplate() {
       const data =
         await lclTemplateService.getHierarchicalData(lclDefaultStructure.id);
       setHierarchicalData(data);
+      setStructureId(lclDefaultStructure.id);
 
       // Load previously-added items from the most recent BOQ (saved or draft)
       try {
@@ -426,6 +428,7 @@ export default function LCLTemplate() {
         templateStructure={undefined}
         companyId={companyId}
         initialItems={initialItems}
+        structureId={structureId}
       />
     </div>
   );

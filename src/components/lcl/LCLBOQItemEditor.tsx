@@ -14,9 +14,11 @@ import { AlertCircle, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { LCLHierarchicalData, LCLTemplateStructure } from '@/types/lclTemplate';
 import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 import { lclBoqService } from '@/services/lclBoqService';
+import { lclTemplateService } from '@/services/lclTemplateService';
 import { formatNumberWithoutTrailingZeros } from '@/utils/numberFormatter';
 
 export interface ItemSnapshot {
+  id?: string;
   section_id: string;
   section_name?: string;
   subsection_id: string;
@@ -50,6 +52,7 @@ interface LCLBOQItemEditorProps {
   templateStructure?: LCLTemplateStructure;
   companyId?: string;
   initialItems?: ItemSnapshot[];
+  structureId?: string;
 }
 
 const getDraftKey = (structureId: string) => `lcl_boq_creation_draft_${structureId}`;
@@ -65,6 +68,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
   templateStructure,
   companyId,
   initialItems,
+  structureId,
 }: LCLBOQItemEditorProps, ref) {
   const [items, setItems] = useState<ItemSnapshot[]>([]);
   const [inlineEdits, setInlineEdits] = useState<{ [itemId: string]: InlineEdit }>({});
@@ -119,6 +123,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
       section.subsections.forEach((subsection) => {
         subsection.items.forEach((item: any) => {
           snapshot.push({
+            id: item.id,
             section_id: section.section_id,
             section_name: section.section_name,
             subsection_id: subsection.subsection_id,
@@ -340,7 +345,8 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     targetIndex: number,
     subsectionItems: ItemSnapshot[],
     sectionId: string,
-    subsectionId: string
+    subsectionId: string,
+    structureId: string
   ) => {
     e.preventDefault();
 
@@ -355,9 +361,9 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
       return;
     }
 
-    // Find indices within the subsection
-    const draggedIdxInSubsection = subsectionItems.findIndex((item) => item === draggedItem);
-    const targetIdxInSubsection = subsectionItems.findIndex((item) => item === items[targetIndex]);
+    // Find indices within the subsection by id
+    const draggedIdxInSubsection = subsectionItems.findIndex((item) => item.id === draggedItem.id);
+    const targetIdxInSubsection = subsectionItems.findIndex((item) => item.id === items[targetIndex].id);
 
     if (draggedIdxInSubsection === targetIdxInSubsection) {
       setDraggedItemIndex(null);
@@ -379,7 +385,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     // Rebuild full items array with reordered subsection
     const newItems = items.map((item) => {
       if (item.section_id === sectionId && item.subsection_id === subsectionId) {
-        const found = renumbered.find((r) => r.description === item.description && r.unit === item.unit && r.qty === item.qty && r.rate === item.rate);
+        const found = renumbered.find((r) => r.id === item.id);
         return found || item;
       }
       return item;
@@ -390,27 +396,29 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     setDraggedItemIndex(null);
     setDragOverItemIndex(null);
 
-    // Persist to database immediately if companyId is provided
-    if (companyId) {
-      (async () => {
-        try {
-          await lclBoqService.autosaveLCLBOQDraftWithUpsert({
-            company_id: companyId,
-            number: 'DRAFT',
-            items_snapshot: newItems,
-            status: 'draft',
-          });
-          toast({ title: 'Success', description: 'Item reordered and saved.' });
-        } catch (error) {
-          console.error('Failed to persist reorder:', error);
-          toast({
-            title: 'Warning',
-            description: 'Item reordered locally but failed to save to database.',
-            variant: 'destructive',
-          });
-        }
-      })();
-    }
+    // Persist to database immediately
+    (async () => {
+      try {
+        const updatedItemIds = renumbered.map((item) => item.id).filter((id): id is string => !!id);
+        const newSortOrders = renumbered.map((_, idx) => idx);
+
+        await lclTemplateService.updateItemsSortOrder(
+          structureId,
+          sectionId,
+          subsectionId,
+          updatedItemIds,
+          newSortOrders
+        );
+        toast({ title: 'Success', description: 'Item reordered and saved.' });
+      } catch (error) {
+        console.error('Failed to persist reorder:', error);
+        toast({
+          title: 'Warning',
+          description: 'Item reordered locally but failed to save to database.',
+          variant: 'destructive',
+        });
+      }
+    })();
   };
 
   const handleDragEnd = () => {
@@ -611,7 +619,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
                                 onDragStart={(e) => handleDragStart(e, ia.fullIndex)}
                                 onDragOver={(e) => handleDragOver(e, ia.fullIndex)}
                                 onDragLeave={handleDragLeave}
-                                onDrop={(e) => handleDrop(e, ia.fullIndex, entry.itemsWithAmount.map((x) => x.item), sectionId, entry.subsectionId)}
+                                onDrop={(e) => handleDrop(e, ia.fullIndex, entry.itemsWithAmount.map((x) => x.item), sectionId, entry.subsectionId, structureId || '')}
                                 onDragEnd={handleDragEnd}
                                 className={`
                                   cursor-grab active:cursor-grabbing
