@@ -350,7 +350,11 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
   ) => {
     e.preventDefault();
 
-    if (draggedItemIndex === null) return;
+    if (draggedItemIndex === null || draggedItemIndex === targetIndex) {
+      setDraggedItemIndex(null);
+      setDragOverItemIndex(null);
+      return;
+    }
 
     const draggedItem = items[draggedItemIndex];
 
@@ -361,22 +365,20 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
       return;
     }
 
-    // Use positional matching instead of ID-based matching
-    // This works for items with or without IDs
-    const draggedIdxInSubsection = subsectionItems.findIndex((item) => item === draggedItem);
-    const targetItemInSubsection = items[targetIndex];
-    const targetIdxInSubsection = subsectionItems.findIndex((item) => item === targetItemInSubsection);
+    // Find indices using direct subsectionItems reference comparison
+    const draggedIdxInSubsection = subsectionItems.findIndex((item) => items.indexOf(item) === draggedItemIndex);
+    const targetIdxInSubsection = subsectionItems.findIndex((item) => items.indexOf(item) === targetIndex);
 
-    if (draggedIdxInSubsection === -1 || targetIdxInSubsection === -1 || draggedIdxInSubsection === targetIdxInSubsection) {
+    if (draggedIdxInSubsection === -1 || targetIdxInSubsection === -1) {
       setDraggedItemIndex(null);
       setDragOverItemIndex(null);
       return;
     }
 
-    // Reorder subsection items
+    // Reorder subsection items by index
     const reordered = [...subsectionItems];
-    reordered.splice(draggedIdxInSubsection, 1);
-    reordered.splice(targetIdxInSubsection, 0, draggedItem);
+    const [movedItem] = reordered.splice(draggedIdxInSubsection, 1);
+    reordered.splice(targetIdxInSubsection, 0, movedItem);
 
     // Renumber items in the subsection
     const renumbered = reordered.map((item, idx) => ({
@@ -384,11 +386,13 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
       item_number: String(idx + 1),
     }));
 
-    // Rebuild full items array with reordered subsection
+    // Rebuild full items array: replace old subsection items with reordered ones
     const newItems = items.map((item) => {
       if (item.section_id === sectionId && item.subsection_id === subsectionId) {
-        const found = renumbered.find((r) => r === item);
-        return found || item;
+        const idxInSubsection = subsectionItems.indexOf(item);
+        if (idxInSubsection !== -1 && idxInSubsection < renumbered.length) {
+          return renumbered[idxInSubsection];
+        }
       }
       return item;
     });
