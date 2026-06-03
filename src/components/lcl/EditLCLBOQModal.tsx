@@ -24,6 +24,7 @@ import { useCurrentCompany } from '@/contexts/CompanyContext';
 import { useCustomers } from '@/hooks/useDatabase';
 import { downloadLCLBOQPDF } from '@/utils/lclBoqPdfGenerator';
 import { LCLHierarchicalData, LCLTemplateStructure } from '@/types/lclTemplate';
+import { formatNumberWithoutTrailingZeros } from '@/utils/numberFormatter';
 
 interface EditLCLBOQModalProps {
   isOpen: boolean;
@@ -461,7 +462,7 @@ export function EditLCLBOQModal({
                     </span>
                   </div>
                   <span className="text-sm font-medium tabular-nums shrink-0">
-                    {sectionTotal.toFixed(2)}
+                    {formatNumberWithoutTrailingZeros(sectionTotal)}
                   </span>
                 </button>
 
@@ -499,9 +500,9 @@ export function EditLCLBOQModal({
                                   <TableCell>
                                     <Input
                                       type="number"
-                                      value={ia.qty.toString()}
+                                      value={formatNumberWithoutTrailingZeros(ia.qty)}
                                       onChange={(e) => handleQtyChange(ia.fullIndex, e.target.value)}
-                                      className="text-sm"
+                                      className="text-sm w-16 md:w-20 lg:w-24"
                                       step="0.01"
                                       min="0"
                                     />
@@ -509,15 +510,15 @@ export function EditLCLBOQModal({
                                   <TableCell>
                                     <Input
                                       type="number"
-                                      value={ia.rate.toString()}
+                                      value={formatNumberWithoutTrailingZeros(ia.rate)}
                                       onChange={(e) => handleRateChange(ia.fullIndex, e.target.value)}
-                                      className="text-sm"
+                                      className="text-sm w-16 md:w-20 lg:w-24"
                                       step="0.01"
                                       min="0"
                                     />
                                   </TableCell>
                                   <TableCell className="text-right font-medium text-sm tabular-nums">
-                                    {ia.amount.toFixed(2)}
+                                    {formatNumberWithoutTrailingZeros(ia.amount)}
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -526,7 +527,7 @@ export function EditLCLBOQModal({
                                   Subtotal
                                 </TableCell>
                                 <TableCell className="text-right font-medium text-sm tabular-nums">
-                                  {entry.subtotal.toFixed(2)}
+                                  {formatNumberWithoutTrailingZeros(entry.subtotal)}
                                 </TableCell>
                               </TableRow>
                             </TableBody>
@@ -539,7 +540,7 @@ export function EditLCLBOQModal({
                       <div className="text-right">
                         <div className="text-sm text-muted-foreground">Section Total</div>
                         <div className="text-lg font-bold tabular-nums">
-                          {sectionTotal.toFixed(2)}
+                          {formatNumberWithoutTrailingZeros(sectionTotal)}
                         </div>
                       </div>
                     </div>

@@ -14,6 +14,7 @@ import { AlertCircle, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { LCLHierarchicalData, LCLTemplateStructure } from '@/types/lclTemplate';
 import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 import { lclBoqService } from '@/services/lclBoqService';
+import { formatNumberWithoutTrailingZeros } from '@/utils/numberFormatter';
 
 export interface ItemSnapshot {
   section_id: string;
@@ -468,7 +469,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
                 </button>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="text-sm font-medium tabular-nums">
-                    {sectionTotal.toFixed(2)}
+                    {formatNumberWithoutTrailingZeros(sectionTotal)}
                   </span>
                   <Button
                     size="sm"
@@ -521,9 +522,9 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
                                 <TableCell>
                                   <Input
                                     type="number"
-                                    value={ia.qty.toString()}
+                                    value={formatNumberWithoutTrailingZeros(ia.qty)}
                                     onChange={(e) => handleQtyChange(ia.fullIndex, e.target.value)}
-                                    className="text-sm h-8"
+                                    className="text-sm h-8 w-16 md:w-20 lg:w-24"
                                     step="0.01"
                                     min="0"
                                   />
@@ -531,15 +532,15 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
                                 <TableCell>
                                   <Input
                                     type="number"
-                                    value={ia.rate.toString()}
+                                    value={formatNumberWithoutTrailingZeros(ia.rate)}
                                     onChange={(e) => handleRateChange(ia.fullIndex, e.target.value)}
-                                    className="text-sm h-8"
+                                    className="text-sm h-8 w-16 md:w-20 lg:w-24"
                                     step="0.01"
                                     min="0"
                                   />
                                 </TableCell>
                                 <TableCell className="text-right font-medium text-sm tabular-nums">
-                                  {ia.amount.toFixed(2)}
+                                  {formatNumberWithoutTrailingZeros(ia.amount)}
                                 </TableCell>
                                 <TableCell>
                                   <Button
@@ -577,7 +578,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
                                 Subtotal
                               </TableCell>
                               <TableCell className="text-right font-medium text-sm tabular-nums">
-                                {entry.subtotal.toFixed(2)}
+                                {formatNumberWithoutTrailingZeros(entry.subtotal)}
                               </TableCell>
                               <TableCell></TableCell>
                             </TableRow>
@@ -591,7 +592,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
                     <div className="text-right">
                       <div className="text-sm text-muted-foreground">Section Total</div>
                       <div className="text-lg font-bold tabular-nums">
-                        {sectionTotal.toFixed(2)}
+                        {formatNumberWithoutTrailingZeros(sectionTotal)}
                       </div>
                     </div>
                   </div>
@@ -671,7 +672,7 @@ function AddItemRow({
         />
       </TableCell>
       <TableCell className="text-right text-sm tabular-nums">
-        {(parseFloat(qty || '0') * parseFloat(rate || '0')).toFixed(2)}
+        {formatNumberWithoutTrailingZeros(parseFloat(qty || '0') * parseFloat(rate || '0'))}
       </TableCell>
       <TableCell>
         <div className="flex gap-1">

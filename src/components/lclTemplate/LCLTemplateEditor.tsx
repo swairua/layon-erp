@@ -30,6 +30,7 @@ import {
   loadDraftFromLocalStorage,
   clearDraftFromLocalStorage,
 } from '@/utils/lclTemplateAutosaveUtils';
+import { formatNumberWithoutTrailingZeros } from '@/utils/numberFormatter';
 import { LCLTemplateSaveIndicator } from './LCLTemplateSaveIndicator';
 
 interface LCLTemplateEditorProps {
@@ -75,13 +76,6 @@ export function LCLTemplateEditor({
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const latestInlineEditsRef = useRef<{ [itemId: string]: InlineEdit }>({});
   const { toast } = useToast();
-
-  // Format number to remove unnecessary decimals (1.00 → 1, 1.50 → 1.5)
-  const formatNumber = (value: number): string => {
-    if (typeof value !== 'number') return '0';
-    const formatted = value.toLocaleString('en-KE', { maximumFractionDigits: 2 });
-    return formatted.replace(/\.?0+$/, '');
-  };
 
   // Calculate item amount with inline edits
   const getItemAmount = (item: LCLItemWithCalculations): number => {
@@ -717,7 +711,7 @@ export function LCLTemplateEditor({
           <p className="text-sm font-medium">
             Grand Total (KES):{' '}
             <span className="text-lg font-bold">
-              Ksh{formatNumber(getGrandTotal())}
+              Ksh{formatNumberWithoutTrailingZeros(getGrandTotal())}
             </span>
           </p>
         </div>
@@ -759,7 +753,7 @@ export function LCLTemplateEditor({
                   })()}
                 </div>
                 <p className="text-sm font-medium">
-                  Section Total (KES): Ksh{formatNumber(totals[section.section_id]?.section || 0)}
+                  Section Total (KES): Ksh{formatNumberWithoutTrailingZeros(totals[section.section_id]?.section || 0)}
                 </p>
               </button>
               <Button
@@ -908,7 +902,7 @@ export function LCLTemplateEditor({
                                   {editingItem?.itemId === item.id ? (
                                     <Input
                                       type="number"
-                                      value={editingItem.qty || ''}
+                                      value={formatNumberWithoutTrailingZeros(editingItem.qty || '')}
                                       onChange={(e) =>
                                         setEditingItem({
                                           ...editingItem,
@@ -916,16 +910,16 @@ export function LCLTemplateEditor({
                                         })
                                       }
                                       disabled={loading}
-                                      className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-full"
+                                      className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-16 md:w-20 lg:w-24"
                                       step="0.01"
                                     />
                                   ) : (
                                     <Input
                                       type="number"
-                                      value={inlineEdits[item.id]?.qty !== undefined ? inlineEdits[item.id].qty || '' : (item.default_qty || '') }
+                                      value={formatNumberWithoutTrailingZeros(inlineEdits[item.id]?.qty !== undefined ? inlineEdits[item.id].qty || '' : (item.default_qty || ''))}
                                       onChange={(e) => handleInlineQtyChange(item.id, e.target.value)}
                                       disabled={loading}
-                                      className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-full"
+                                      className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-16 md:w-20 lg:w-24"
                                       step="0.01"
                                     />
                                   )}
@@ -934,7 +928,7 @@ export function LCLTemplateEditor({
                                   {editingItem?.itemId === item.id ? (
                                     <Input
                                       type="number"
-                                      value={editingItem.rate || ''}
+                                      value={formatNumberWithoutTrailingZeros(editingItem.rate || '')}
                                       onChange={(e) =>
                                         setEditingItem({
                                           ...editingItem,
@@ -942,24 +936,24 @@ export function LCLTemplateEditor({
                                         })
                                       }
                                       disabled={loading}
-                                      className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-full"
+                                      className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-16 md:w-20 lg:w-24"
                                       step="0.01"
                                     />
                                   ) : (
                                     <Input
                                       type="number"
-                                      value={inlineEdits[item.id]?.rate !== undefined ? inlineEdits[item.id].rate || '' : (item.default_rate || '')}
+                                      value={formatNumberWithoutTrailingZeros(inlineEdits[item.id]?.rate !== undefined ? inlineEdits[item.id].rate || '' : (item.default_rate || ''))}
                                       onChange={(e) => handleInlineRateChange(item.id, e.target.value)}
                                       disabled={loading}
-                                      className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-full"
+                                      className="h-7 text-right text-xs md:text-xs px-0.5 py-0 w-16 md:w-20 lg:w-24"
                                       step="0.01"
                                     />
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right text-sm font-semibold">
                                   {editingItem?.itemId === item.id
-                                    ? formatNumber(amount)
-                                    : formatNumber(getItemAmount(item))}
+                                    ? formatNumberWithoutTrailingZeros(amount)
+                                    : formatNumberWithoutTrailingZeros(getItemAmount(item))}
                                 </TableCell>
                                 <TableCell>
                                   {editingItem?.itemId === item.id ? (
@@ -1015,7 +1009,7 @@ export function LCLTemplateEditor({
                             <TableRow className="bg-gray-100 hover:bg-gray-100 cursor-default font-semibold">
                               <TableCell colSpan={5} className="text-sm py-2"></TableCell>
                               <TableCell className="text-right text-sm font-semibold py-2">
-                                Ksh{formatNumber(totals[section.section_id]?.subsections[subsection.subsection_id] || 0)}
+                                Ksh{formatNumberWithoutTrailingZeros(totals[section.section_id]?.subsections[subsection.subsection_id] || 0)}
                               </TableCell>
                               <TableCell></TableCell>
                             </TableRow>
@@ -1067,7 +1061,7 @@ export function LCLTemplateEditor({
                                 <TableCell className="text-right text-sm">
                                   <Input
                                     type="number"
-                                    value={editingItem.qty}
+                                    value={formatNumberWithoutTrailingZeros(editingItem.qty)}
                                     onChange={(e) =>
                                       setEditingItem({
                                         ...editingItem,
@@ -1075,15 +1069,15 @@ export function LCLTemplateEditor({
                                       })
                                     }
                                     disabled={loading}
-                                    className="h-10 text-right text-base md:text-base px-2 py-1"
-                                    placeholder="0.00"
+                                    className="h-10 text-right text-base md:text-base px-2 py-1 w-20 md:w-24 lg:w-32"
+                                    placeholder="0"
                                     step="0.01"
                                   />
                                 </TableCell>
                                 <TableCell className="text-right text-sm">
                                   <Input
                                     type="number"
-                                    value={editingItem.rate}
+                                    value={formatNumberWithoutTrailingZeros(editingItem.rate)}
                                     onChange={(e) =>
                                       setEditingItem({
                                         ...editingItem,
@@ -1091,13 +1085,13 @@ export function LCLTemplateEditor({
                                       })
                                     }
                                     disabled={loading}
-                                    className="h-10 text-right text-base md:text-base px-2 py-1"
-                                    placeholder="0.00"
+                                    className="h-10 text-right text-base md:text-base px-2 py-1 w-20 md:w-24 lg:w-32"
+                                    placeholder="0"
                                     step="0.01"
                                   />
                                 </TableCell>
                                 <TableCell className="text-right text-sm font-semibold">
-                                  {formatNumber(amount)}
+                                  {formatNumberWithoutTrailingZeros(amount)}
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex gap-1">
