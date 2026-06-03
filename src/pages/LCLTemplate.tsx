@@ -7,7 +7,7 @@ import { useCurrentCompany } from '@/contexts/CompanyContext';
 import { useCustomers } from '@/hooks/useDatabase';
 import { lclTemplateService } from '@/services/lclTemplateService';
 import { LCLHierarchicalData } from '@/types/lclTemplate';
-import { LCLBOQItemEditor, LCLBOQItemEditorHandle } from '@/components/lcl/LCLBOQItemEditor';
+import { LCLBOQItemEditor, LCLBOQItemEditorHandle, ItemSnapshot } from '@/components/lcl/LCLBOQItemEditor';
 import { lclBoqService, LCLBOQRecord } from '@/services/lclBoqService';
 import { generateNextBOQNumber } from '@/utils/boqNumberGenerator';
 import { downloadLCLBOQPDF, reconstructHierarchicalDataFromSnapshot } from '@/utils/lclBoqPdfGenerator';
@@ -41,6 +41,8 @@ export default function LCLTemplate() {
   const editorRef = useRef<LCLBOQItemEditorHandle>(null);
   const headerAutosaveRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [initialItems, setInitialItems] = useState<ItemSnapshot[]>([]);
+
   const loadLCLBOQData = async () => {
     if (!companyId) return;
 
@@ -67,6 +69,18 @@ export default function LCLTemplate() {
       const data =
         await lclTemplateService.getHierarchicalData(lclDefaultStructure.id);
       setHierarchicalData(data);
+
+      // Load previously-added items from the most recent BOQ (saved or draft)
+      try {
+        const boqs = await lclBoqService.getLCLBOQs(companyId);
+        // Get the most recent BOQ with items
+        const latestBoq = boqs[0];
+        if (latestBoq && latestBoq.items_snapshot && latestBoq.items_snapshot.length > 0) {
+          setInitialItems(latestBoq.items_snapshot);
+        }
+      } catch (itemsError) {
+        console.log('Note: Could not load previous items:', itemsError);
+      }
 
       // Generate next BOQ number - checks both boqs and lcl_boqs tables
       try {
@@ -410,6 +424,8 @@ export default function LCLTemplate() {
         ref={editorRef}
         data={hierarchicalData}
         templateStructure={undefined}
+        companyId={companyId}
+        initialItems={initialItems}
       />
     </div>
   );

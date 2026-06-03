@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertCircle, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { LCLHierarchicalData, LCLTemplateStructure } from '@/types/lclTemplate';
 import { ConfirmationDialog } from '@/components/ConfirmationDialog';
+import { lclBoqService } from '@/services/lclBoqService';
 
 export interface ItemSnapshot {
   section_id: string;
@@ -46,6 +47,8 @@ export interface LCLBOQItemEditorHandle {
 interface LCLBOQItemEditorProps {
   data: LCLHierarchicalData;
   templateStructure?: LCLTemplateStructure;
+  companyId?: string;
+  initialItems?: ItemSnapshot[];
 }
 
 const getDraftKey = (structureId: string) => `lcl_boq_creation_draft_${structureId}`;
@@ -59,6 +62,8 @@ interface AutosaveDraft {
 export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEditorProps>(function LCLBOQItemEditor({
   data,
   templateStructure,
+  companyId,
+  initialItems,
 }: LCLBOQItemEditorProps, ref) {
   const [items, setItems] = useState<ItemSnapshot[]>([]);
   const [inlineEdits, setInlineEdits] = useState<{ [itemId: string]: InlineEdit }>({});
@@ -153,6 +158,11 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
       if (restoredLastSavedAt) {
         setLastSavedTime(restoredLastSavedAt);
       }
+    } else if (initialItems && initialItems.length > 0) {
+      // Use provided initial items (from previously-saved BOQ)
+      setItems(initialItems);
+      setInlineEdits({});
+      inlineEditsRef.current = {};
     } else {
       setItems(flattenHierarchyToSnapshot(data));
       setInlineEdits({});
@@ -312,7 +322,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     setDraftPending(true);
   };
 
-  const confirmAddItem = (description: string, unit: string, qty: number, rate: number) => {
+  const confirmAddItem = async (description: string, unit: string, qty: number, rate: number) => {
     if (!addItemForm) return;
     setDraftPending(true);
     const section = data.sections.find(
@@ -344,7 +354,30 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
 
     setItems((prev) => [...prev, newItem]);
     setAddItemForm(null);
-    toast({ title: 'Success', description: 'Item added.' });
+
+    // Persist to database immediately if companyId is provided
+    if (companyId) {
+      try {
+        const updatedItems = [...items, newItem];
+        // Save draft BOQ with updated items
+        await lclBoqService.autosaveLCLBOQDraft({
+          company_id: companyId,
+          number: 'DRAFT',
+          items_snapshot: updatedItems,
+          status: 'draft',
+        });
+        toast({ title: 'Success', description: 'Item added and saved.' });
+      } catch (error) {
+        console.error('Failed to persist item:', error);
+        toast({
+          title: 'Warning',
+          description: 'Item added locally but failed to save to database.',
+          variant: 'destructive',
+        });
+      }
+    } else {
+      toast({ title: 'Success', description: 'Item added.' });
+    }
   };
 
   // Group items by section for rendering
@@ -531,9 +564,8 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
                                 <TableCell colSpan={7} className="p-1">
                                   <Button
                                     size="sm"
-                                    variant="ghost"
+                                    className="text-xs w-full bg-green-600 hover:bg-green-700 text-white"
                                     onClick={() => handleAddItem(entry.subsectionId, sectionLetter)}
-                                    className="text-xs text-muted-foreground w-full"
                                   >
                                     <Plus className="h-3 w-3 mr-1" /> Add Item
                                   </Button>
@@ -591,7 +623,7 @@ function AddItemRow({
   onConfirm,
   onCancel,
 }: {
-  onConfirm: (description: string, unit: string, qty: number, rate: number) => void;
+  onConfirm: (description: string, unit: string, qty: number, rate: number) => void | Promise<void>;
   onCancel: () => void;
 }) {
   const [description, setDescription] = useState('New item');
@@ -645,11 +677,10 @@ function AddItemRow({
         <div className="flex gap-1">
           <Button
             size="sm"
-            variant="default"
             onClick={() => onConfirm(description, unit, parseFloat(qty || '0'), parseFloat(rate || '0'))}
-            className="h-7 text-xs"
+            className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
           >
-            Add
+            Confirm Addition
           </Button>
           <Button
             size="sm"
