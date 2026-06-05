@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,7 +21,7 @@ import {
 import { Download, Save } from 'lucide-react';
 
 export default function LCLTemplate() {
-  const { currentCompany } = useCurrentCompany();
+  const { currentCompany, isLoading: isCompanyLoading } = useCurrentCompany();
   const companyId = currentCompany?.id || '';
   const { toast } = useToast();
   const { data: customers } = useCustomers(companyId);
@@ -44,7 +44,7 @@ export default function LCLTemplate() {
   const [initialItems, setInitialItems] = useState<ItemSnapshot[]>([]);
   const [structureId, setStructureId] = useState<string>('');
 
-  const loadLCLBOQData = async () => {
+  const loadLCLBOQData = useCallback(async () => {
     if (!companyId) return;
 
     setLoading(true);
@@ -106,7 +106,7 @@ export default function LCLTemplate() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId, toast]);
 
   const handleSaveLCLBOQ = async () => {
     if (!hierarchicalData || !companyId) return;
@@ -282,8 +282,9 @@ export default function LCLTemplate() {
   };
 
   useEffect(() => {
+    if (isCompanyLoading) return;
     loadLCLBOQData();
-  }, [companyId]);
+  }, [loadLCLBOQData, isCompanyLoading]);
 
   // Autosave header fields to localStorage (2s debounce)
   useEffect(() => {
@@ -319,7 +320,7 @@ export default function LCLTemplate() {
     } catch { /* ignore */ }
   }, [hierarchicalData]);
 
-  if (loading) {
+  if (loading || isCompanyLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <p className="text-muted-foreground">Loading LCL BOQ...</p>
