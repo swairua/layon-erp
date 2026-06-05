@@ -55,9 +55,12 @@ export default function LCLBOQList() {
   };
 
   const loadBoqs = async () => {
-    if (!companyId) return;
-
     setLoading(true);
+    if (!companyId) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const data = await lclBoqService.getLCLBOQs(companyId);
       setBoqs(data);
