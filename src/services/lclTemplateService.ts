@@ -334,6 +334,56 @@ export class LCLTemplateService {
     return await this.getStructure(structureId);
   }
 
+  async addSection(
+    structureId: string,
+    customName?: string
+  ): Promise<LCLTemplateStructure> {
+    const structure = await this.getStructure(structureId);
+    const sections = structure.structure_data.sections;
+
+    // Find next available letter
+    const existingLetters = new Set<string>();
+    sections.forEach((section: any) => {
+      const match = section.id.match(/section[_-]?([a-z])/i);
+      if (match) {
+        existingLetters.add(match[1].toUpperCase());
+      }
+    });
+
+    let nextLetter = 'A';
+    for (let i = 0; i < 26; i++) {
+      const letter = String.fromCharCode(65 + i);
+      if (!existingLetters.has(letter)) {
+        nextLetter = letter;
+        break;
+      }
+    }
+
+    // Create new section with initial subsection
+    const newSectionId = `section_${nextLetter.toLowerCase()}`;
+    const newSubsectionId = `${newSectionId}_${nextLetter.toLowerCase()}_name`;
+    const sectionName = customName || `Section ${nextLetter}: New Section`;
+
+    const newSection = {
+      id: newSectionId,
+      name: `SECTION ${nextLetter}: ${sectionName}`,
+      subsections: [
+        {
+          id: newSubsectionId,
+          name: `${nextLetter}. ${sectionName}`,
+        },
+      ],
+    };
+
+    const updatedSections = [...sections, newSection];
+
+    return this.updateStructure(structureId, {
+      structure_data: {
+        sections: updatedSections,
+      },
+    });
+  }
+
   async recordHistory(
     structureId: string,
     companyId: string,

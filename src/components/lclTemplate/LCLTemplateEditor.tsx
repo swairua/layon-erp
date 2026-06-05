@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Trash2, Check, X, Edit2, Trash } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, Check, X, Edit2, Trash, Edit } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -58,6 +58,11 @@ interface EditingSectionTitle {
   name: string;
 }
 
+interface AddingSectionForm {
+  isOpen: boolean;
+  customName: string;
+}
+
 export function LCLTemplateEditor({
   data,
   onDataUpdated,
@@ -73,6 +78,7 @@ export function LCLTemplateEditor({
   const [addingItemTo, setAddingItemTo] = useState<string | null>(null);
   const [inlineEdits, setInlineEdits] = useState<{ [itemId: string]: InlineEdit }>({});
   const [editingSectionTitle, setEditingSectionTitle] = useState<EditingSectionTitle | null>(null);
+  const [addingSection, setAddingSection] = useState<AddingSectionForm>({ isOpen: false, customName: '' });
   const [loading, setLoading] = useState(false);
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
@@ -201,7 +207,7 @@ export function LCLTemplateEditor({
     flattenedItems.push({
       id: `section-total-${section.section_id}`,
       type: 'sectionTotal',
-      description: `SECTION ${sectionLetter} TOTAL: ${section.section_name}`,
+      description: `SECTION ${sectionLetter} TOTAL: ${displayName}`,
       line_total: sectionTotal,
       sectionId: section.section_id,
     });
@@ -639,6 +645,29 @@ export function LCLTemplateEditor({
     });
   };
 
+  const handleAddSection = async () => {
+    const customName = addingSection.customName.trim() || 'New Section';
+    setLoading(true);
+    try {
+      await lclTemplateService.addSection(data.structure_id, customName);
+      toast({
+        title: 'Success',
+        description: 'New section added successfully.',
+      });
+      setAddingSection({ isOpen: false, customName: '' });
+      await onDataUpdated();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description:
+          error instanceof Error ? error.message : 'Failed to add section',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSaveSectionTitle = async () => {
     if (!editingSectionTitle || !editingSectionTitle.name.trim()) {
       toast({
@@ -672,6 +701,10 @@ export function LCLTemplateEditor({
           sections: updatedSections,
         },
       });
+
+      // Also update section names in current inline edits context if needed
+      const updatedInlineEdits = { ...inlineEdits };
+      setInlineEdits(updatedInlineEdits);
 
       toast({
         title: 'Success',
@@ -805,7 +838,33 @@ export function LCLTemplateEditor({
                   ) : (
                     <ChevronRight className="h-4 w-4" />
                   )}
-                  <h3 className="font-semibold">{getDisplaySectionName(section.section_name)}</h3>
+                  {editingSectionTitle?.sectionId === section.section_id ? (
+                    <Input
+                      value={editingSectionTitle.name}
+                      onChange={(e) => setEditingSectionTitle({ ...editingSectionTitle, name: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleSaveSectionTitle();
+                        } else if (e.key === 'Escape') {
+                          setEditingSectionTitle(null);
+                        }
+                      }}
+                      className="h-8 font-semibold"
+                      disabled={loading}
+                      autoFocus
+                    />
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditSectionTitle(section.section_id, section.section_name);
+                      }}
+                      className="font-semibold hover:bg-muted px-2 py-1 rounded transition-colors"
+                      title="Click to edit section name"
+                    >
+                      {getDisplaySectionName(section.section_name)}
+                    </button>
+                  )}
                   {(() => {
                     const inheritanceMap: { [key: string]: string } = {
                       'section_d': 'section_b',
@@ -1219,6 +1278,49 @@ export function LCLTemplateEditor({
             )}
           </div>
         ))}
+
+        {/* Add Section button */}
+        <div className="mt-6 flex gap-2">
+          {!addingSection.isOpen ? (
+            <Button
+              onClick={() => setAddingSection({ isOpen: true, customName: '' })}
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              + Add Section
+            </Button>
+          ) : (
+            <div className="flex gap-2 w-full max-w-md">
+              <Input
+                placeholder="Section name (optional)"
+                value={addingSection.customName}
+                onChange={(e) => setAddingSection({ ...addingSection, customName: e.target.value })}
+                disabled={loading}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAddSection();
+                  } else if (e.key === 'Escape') {
+                    setAddingSection({ isOpen: false, customName: '' });
+                  }
+                }}
+              />
+              <Button
+                onClick={handleAddSection}
+                disabled={loading}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Check className="h-4 w-4 mr-1" /> Add
+              </Button>
+              <Button
+                onClick={() => setAddingSection({ isOpen: false, customName: '' })}
+                disabled={loading}
+                variant="outline"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

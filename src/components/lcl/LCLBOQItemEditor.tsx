@@ -294,7 +294,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     setRemoveConfirm({ type: 'item', id: `item-${itemIndex}`, label: description });
   };
 
-  const confirmRemove = () => {
+  const confirmRemove = async () => {
     if (!removeConfirm) return;
     setDraftPending(true);
     if (removeConfirm.type === 'section') {
@@ -312,7 +312,17 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
         });
         return updatedItems;
       });
-      toast({ title: 'Success', description: `Section removed.` });
+
+      // Renumber sections in global template if we have the structureId
+      if (structureId) {
+        try {
+          await lclTemplateService.renumberSectionDisplayNames(structureId, removeConfirm.id);
+        } catch (error) {
+          console.error('Failed to renumber sections:', error);
+        }
+      }
+
+      toast({ title: 'Success', description: `Section removed and remaining sections renumbered.` });
     } else {
       const idx = parseInt(removeConfirm.id.replace('item-', ''), 10);
       setItems((prev) => prev.filter((_, i) => i !== idx));
