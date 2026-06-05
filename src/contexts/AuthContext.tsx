@@ -304,6 +304,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const completeInit = () => {
       if (!completed && mountedRef.current) {
         completed = true;
+        initializingRef.current = false;
         setLoading(false);
         setInitialized(true);
       }
@@ -399,6 +400,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [fetchProfile, handleAuthStateChange]);
 
   const signIn = useCallback(async (email: string, password: string) => {
+    const hardTimeoutId = setTimeout(() => {
+      console.warn('⚠️ Sign-in hard timeout (3s): forcing loading state clear');
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }, 3000);
+
     const { data, error } = await safeAuthOperation(async () => {
       setLoading(true);
       return await supabase.auth.signInWithPassword({
@@ -408,6 +416,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }, 'signIn');
 
     if (error) {
+      clearTimeout(hardTimeoutId);
       setLoading(false);
       // Ensure error is a proper Error object with a message property
       const errorMessage = parseErrorMessage(error);
@@ -416,6 +425,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     if (data?.error) {
+      clearTimeout(hardTimeoutId);
       setLoading(false);
       // Ensure error is a proper Error object with a message property
       const errorMessage = parseErrorMessage(data.error);
@@ -527,6 +537,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
       setLoading(false);
     }
+    clearTimeout(hardTimeoutId);
     setTimeout(() => toast.success('Signed in successfully'), 0);
     return { error: null };
   }, [fetchProfile]);

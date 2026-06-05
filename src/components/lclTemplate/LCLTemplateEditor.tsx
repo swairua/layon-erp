@@ -586,7 +586,7 @@ export function LCLTemplateEditor({
   };
 
   const handleDeleteSection = async (sectionId: string, sectionName: string) => {
-    if (!window.confirm(`Remove "${sectionName}" from this BOQ? The template remains unchanged.`)) return;
+    if (!window.confirm(`Remove "${sectionName}" from this template? All items in this section will be deleted.`)) return;
 
     setLoading(true);
     try {

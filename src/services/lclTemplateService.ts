@@ -286,43 +286,80 @@ export class LCLTemplateService {
     const structure = await this.getStructure(structureId);
     const sections = structure.structure_data.sections;
 
-    // Find index of deleted section
-    const deletedIndex = sections.findIndex((s: any) => s.id === deletedSectionId);
-    if (deletedIndex === -1) {
+    // Remove the deleted section from array
+    const remainingSections = sections.filter(
+      (s: any) => s.id !== deletedSectionId
+    );
+
+    if (remainingSections.length === sections.length) {
       return structure;
     }
 
-    // Map old letter to new letter for sections after the deleted one
-    const letterMap = new Map<string, string>();
-    let newLetter = String.fromCharCode(65 + deletedIndex);
+    // Create mapping of old section IDs to new section IDs with consecutive letters
+    const sectionIdMap = new Map<string, string>();
+    const updatedSections = remainingSections.map((section: any, index: number) => {
+      const newLetter = String.fromCharCode(65 + index);
+      const oldId = section.id;
+      const newId = `section_${newLetter.toLowerCase()}`;
 
-    for (let i = deletedIndex + 1; i < sections.length; i++) {
-      const section = sections[i];
-      const oldLetter = String.fromCharCode(65 + i);
-      letterMap.set(oldLetter, newLetter);
-      newLetter = String.fromCharCode(newLetter.charCodeAt(0) + 1);
-    }
+      sectionIdMap.set(oldId, newId);
 
-    // Renumber display names for affected sections
-    const updatedSections = sections.map((section: any, index: number) => {
-      if (index <= deletedIndex) return section;
+      // Extract custom name and update with new letter
+      const nameMatch = section.name.match(/^(?:SECTION|Section)\s+[A-Z]:\s*(.+)$/);
+      const customName = nameMatch ? nameMatch[1] : section.name;
 
-      const currentLetter = String.fromCharCode(65 + index);
-      const newLetter = letterMap.get(currentLetter);
+      // Also rebuild subsection IDs to match the new section ID
+      const updatedSubsections = section.subsections.map(
+        (subsection: any) => {
+          const oldSubsectionId = subsection.id;
+          // Subsection IDs follow pattern: section_X_X_name, where X is the letter
+          // Replace both occurrences: section_d_d_name -> section_c_c_name
+          const oldLetter = oldId.match(/section_([a-z])/)?.[1] || '';
+          const newLetter = newId.match(/section_([a-z])/)?.[1] || '';
+          const newSubsectionId = oldSubsectionId.replace(
+            new RegExp(oldLetter, 'g'),
+            newLetter
+          );
+          sectionIdMap.set(oldSubsectionId, newSubsectionId);
+          return {
+            ...subsection,
+            id: newSubsectionId,
+          };
+        }
+      );
 
-      if (newLetter && newLetter !== currentLetter) {
-        // Extract custom name (everything after colon)
-        const nameMatch = section.name.match(/^(?:SECTION|Section)\s+[A-Z]:\s*(.+)$/);
-        const customName = nameMatch ? nameMatch[1] : section.name;
-
-        return {
-          ...section,
-          name: `SECTION ${newLetter}: ${customName}`,
-        };
-      }
-
-      return section;
+      return {
+        ...section,
+        id: newId,
+        name: `SECTION ${newLetter}: ${customName}`,
+        subsections: updatedSubsections,
+      };
     });
+
+    // Update all item references to use new section and subsection IDs
+    const items = await this.getStructureItems(structureId);
+    for (const item of items) {
+      const newSectionId = sectionIdMap.get(item.section_id);
+      const newSubsectionId = sectionIdMap.get(item.subsection_id);
+
+      if (newSectionId && newSubsectionId) {
+        await this.updateItem(item.id, {
+          section_id: newSectionId,
+          subsection_id: newSubsectionId,
+        });
+      } else if (newSectionId && !newSubsectionId) {
+        // If subsection ID mapping not found but section ID is found, rebuild it with new letter
+        const oldLetter = item.section_id.match(/section_([a-z])/)?.[1] || '';
+        const newLetterFromId = newSectionId.match(/section_([a-z])/)?.[1] || '';
+        const newSubId = item.subsection_id
+          .replace(item.section_id, newSectionId)
+          .replace(new RegExp(oldLetter, 'g'), newLetterFromId);
+        await this.updateItem(item.id, {
+          section_id: newSectionId,
+          subsection_id: newSubId,
+        });
+      }
+    }
 
     // Persist updated sections
     await this.updateStructure(structureId, {
