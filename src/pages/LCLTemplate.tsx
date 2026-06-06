@@ -43,6 +43,7 @@ export default function LCLTemplate() {
   const [lclBoqRecord, setLclBoqRecord] = useState<LCLBOQRecord | null>(null);
   const editorRef = useRef<LCLBOQItemEditorHandle>(null);
   const headerAutosaveRef = useRef<NodeJS.Timeout | null>(null);
+  const hasAttemptedRestoreRef = useRef(false);
 
   const [initialItems, setInitialItems] = useState<ItemSnapshot[]>([]);
   const [structureId, setStructureId] = useState<string>('');
@@ -56,7 +57,7 @@ export default function LCLTemplate() {
 
   const loadLCLBOQData = useCallback(async () => {
     if (!companyId) {
-      console.warn('[LCLTemplate] Company ID is empty, skipping data load');
+      console.log('[LCLTemplate] Company ID not set yet, skipping data load');
       setLoading(false);
       return;
     }
@@ -303,16 +304,16 @@ export default function LCLTemplate() {
       console.log('[LCLTemplate] ⏳ Company still loading, skipping loadLCLBOQData until company context ready');
       return;
     }
-    if (!companyId) {
-      console.warn('[LCLTemplate] ⚠️ Company ID is empty, waiting for company context to populate');
-      return;
-    }
-    console.log('[LCLTemplate] 📊 Company ready, calling loadLCLBOQData');
+    console.log('[LCLTemplate] 📊 Calling loadLCLBOQData');
     loadLCLBOQData();
   }, [loadLCLBOQData, isCompanyLoading, companyId]);
 
   // Autosave header fields to localStorage (2s debounce)
   useEffect(() => {
+    if (!hasAttemptedRestoreRef.current) {
+      return;
+    }
+
     if (headerAutosaveRef.current) {
       clearTimeout(headerAutosaveRef.current);
     }
@@ -340,15 +341,33 @@ export default function LCLTemplate() {
   // Restore header fields from localStorage after data loads
   useEffect(() => {
     if (!hierarchicalData) return;
+
+    let hasRestored = false;
     try {
       const raw = localStorage.getItem('lcl_boq_creation_header');
       if (raw) {
         const saved = JSON.parse(raw);
-        if (saved.selectedCustomerId) setSelectedCustomerId(saved.selectedCustomerId);
-        if (saved.projectTitle) setProjectTitle(saved.projectTitle);
-        if (saved.boqDate) setBoqDate(saved.boqDate);
+        if (saved.selectedCustomerId) {
+          setSelectedCustomerId(saved.selectedCustomerId);
+          hasRestored = true;
+        }
+        if (saved.projectTitle) {
+          setProjectTitle(saved.projectTitle);
+          hasRestored = true;
+        }
+        if (saved.boqDate) {
+          setBoqDate(saved.boqDate);
+          hasRestored = true;
+        }
       }
     } catch { /* ignore */ }
+
+    // Mark that we've attempted restoration so autosave can begin
+    hasAttemptedRestoreRef.current = true;
+
+    if (hasRestored) {
+      console.log('[LCLTemplate] ✅ Header fields restored from draft');
+    }
   }, [hierarchicalData]);
 
   if (loading || isCompanyLoading) {
@@ -359,20 +378,6 @@ export default function LCLTemplate() {
           {isCompanyLoading && <p className="text-xs text-muted-foreground/70">Waiting for company context...</p>}
           {loading && companyId && <p className="text-xs text-muted-foreground/70">Loading data for company: {companyId}</p>}
         </div>
-      </div>
-    );
-  }
-
-  if (!hierarchicalData) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
-        <div>
-          <p className="text-muted-foreground mb-2">
-            Unable to load LCL BOQ structure.
-          </p>
-          <p className="text-xs text-muted-foreground/70">Company: {companyId || 'Not loaded'}</p>
-        </div>
-        <Button onClick={loadLCLBOQData}>Try Again</Button>
       </div>
     );
   }
