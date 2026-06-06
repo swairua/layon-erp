@@ -188,10 +188,11 @@ export class LCLTemplateService {
   }
 
   async getHierarchicalData(
-    structureId: string
+    structureId: string,
+    preloadedStructure?: LCLTemplateStructure
   ): Promise<LCLHierarchicalData> {
-    // Fetch structure metadata
-    const structure = await this.getStructure(structureId);
+    // Use preloaded structure if provided, otherwise fetch it
+    const structure = preloadedStructure || await this.getStructure(structureId);
 
     // Fetch all items for this structure
     const items = await this.getStructureItems(structureId);
