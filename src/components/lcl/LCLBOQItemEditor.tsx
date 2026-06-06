@@ -776,9 +776,14 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     }
   };
 
-  // Group items by section for rendering — derive from data.sections so empty sections still appear
+  const hasItemsInSection = (sectionLetter: string): boolean => {
+    return items.some((item) => getSectionLetter(item.section_id) === sectionLetter);
+  };
+
+  // Group items by section for rendering — filter out empty sections
   const sectionLettersFromData = data.sections.map((s) => getSectionLetter(s.section_id));
-  const sectionLetters = Array.from(new Set([...sectionLettersFromData, ...items.map((item) => getSectionLetter(item.section_id))])).sort();
+  const allSectionLetters = Array.from(new Set([...sectionLettersFromData, ...items.map((item) => getSectionLetter(item.section_id))])).sort();
+  const sectionLetters = allSectionLetters.filter((letter) => hasItemsInSection(letter));
 
   return (
     <div className="space-y-4">
