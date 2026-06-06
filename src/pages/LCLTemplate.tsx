@@ -21,10 +21,13 @@ import {
 import { Download, Save } from 'lucide-react';
 
 export default function LCLTemplate() {
+  console.log('[LCLTemplate] Component mounted');
   const { currentCompany, isLoading: isCompanyLoading } = useCurrentCompany();
   const companyId = currentCompany?.id || '';
   const { toast } = useToast();
   const { data: customers } = useCustomers(companyId);
+
+  console.log(`[LCLTemplate] Company context - isLoading: ${isCompanyLoading}, companyId: ${companyId}`);
 
   const [hierarchicalData, setHierarchicalData] =
     useState<LCLHierarchicalData | null>(null);
@@ -46,23 +49,31 @@ export default function LCLTemplate() {
 
   const loadLCLBOQData = useCallback(async () => {
     if (!companyId) {
+      console.warn('[LCLTemplate] Company ID is empty, skipping data load');
       setLoading(false);
       return;
     }
 
     setLoading(true);
+    console.log(`[LCLTemplate] Loading LCL BOQ data for company: ${companyId}`);
     try {
       // Load the default LCL BOQ structure for this company
       const structures = await lclTemplateService.getStructures(companyId);
+      console.log(`[LCLTemplate] Loaded structures: ${structures.length} structure(s) - ${structures.map((s) => s.name).join(', ')}`);
+
       const lclDefaultStructure = structures.find(
         (s) => s.name === 'LCL Default BOQ'
       );
 
       if (!lclDefaultStructure) {
+        const structureNames = structures.length > 0
+          ? structures.map((s) => s.name).join(', ')
+          : 'none';
+        const errorMsg = `LCL Default BOQ structure not found. Found ${structures.length} structure(s): ${structureNames}`;
+        console.error(`[LCLTemplate] ${errorMsg}`);
         toast({
           title: 'Error',
-          description:
-            'LCL Default BOQ structure not found. Please contact support.',
+          description: errorMsg,
           variant: 'destructive',
         });
         setLoading(false);
@@ -70,8 +81,10 @@ export default function LCLTemplate() {
       }
 
       // Load hierarchical data for the default structure
+      console.log(`[LCLTemplate] Loading hierarchical data for structure ID: ${lclDefaultStructure.id}`);
       const data =
         await lclTemplateService.getHierarchicalData(lclDefaultStructure.id);
+      console.log(`[LCLTemplate] Hierarchical data loaded successfully`);
       setHierarchicalData(data);
       setStructureId(lclDefaultStructure.id);
 
@@ -97,13 +110,11 @@ export default function LCLTemplate() {
         setBoqNumber('BOQ-001');
       }
     } catch (error) {
-      console.error('Error loading LCL BOQ:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load LCL BOQ';
+      console.error(`[LCLTemplate] Error loading LCL BOQ for company ${companyId}:`, error);
       toast({
         title: 'Error',
-        description:
-          error instanceof Error
-            ? error.message
-            : 'Failed to load LCL BOQ',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -285,7 +296,12 @@ export default function LCLTemplate() {
   };
 
   useEffect(() => {
-    if (isCompanyLoading) return;
+    console.log(`[LCLTemplate] useEffect triggered - isCompanyLoading: ${isCompanyLoading}`);
+    if (isCompanyLoading) {
+      console.log('[LCLTemplate] Company still loading, skipping loadLCLBOQData');
+      return;
+    }
+    console.log('[LCLTemplate] Calling loadLCLBOQData');
     loadLCLBOQData();
   }, [loadLCLBOQData, isCompanyLoading]);
 
