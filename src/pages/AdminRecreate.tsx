@@ -10,7 +10,7 @@ export default function AdminRecreate() {
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const email = 'info@construction.com';
-  const password = 'Layons123';
+  const password = 'Password123';
 
   const handleCreate = async () => {
     setCreating(true);
