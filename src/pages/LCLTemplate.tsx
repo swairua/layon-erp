@@ -90,30 +90,25 @@ export default function LCLTemplate() {
       // Load hierarchical data for the default structure
       console.log(`[LCLTemplate] Loading hierarchical data for structure ID: ${lclDefaultStructure.id}`);
       const data =
-        await lclTemplateService.getHierarchicalData(lclDefaultStructure.id);
+        await lclTemplateService.getHierarchicalData(lclDefaultStructure.id, lclDefaultStructure);
       console.log(`[LCLTemplate] Hierarchical data loaded successfully`);
       setHierarchicalData(data);
       setStructureId(lclDefaultStructure.id);
 
-      // Load previously-added items from the most recent BOQ (saved or draft)
+      // Parallelize loading of latest BOQ and next BOQ number (both independent)
       try {
-        const boqs = await lclBoqService.getLCLBOQs(companyId);
-        // Get the most recent BOQ with items
-        const latestBoq = boqs[0];
+        const [latestBoq, nextNumber] = await Promise.all([
+          lclBoqService.getLCLBOQLatest(companyId),
+          generateNextBOQNumber(undefined, companyId),
+        ]);
+
         if (latestBoq && latestBoq.items_snapshot && latestBoq.items_snapshot.length > 0) {
           setInitialItems(latestBoq.items_snapshot);
         }
-      } catch (itemsError) {
-        console.log('Note: Could not load previous items:', itemsError);
-      }
 
-      // Generate next BOQ number - checks both boqs and lcl_boqs tables
-      try {
-        const nextNumber = await generateNextBOQNumber(undefined, companyId);
         setBoqNumber(nextNumber);
-      } catch (boqError) {
-        // If error fetching from DB, use default
-        console.log('Note: Error generating BOQ number, using default');
+      } catch (parallelError) {
+        console.log('Note: Error loading latest BOQ or generating BOQ number:', parallelError);
         setBoqNumber('BOQ-001');
       }
     } catch (error) {

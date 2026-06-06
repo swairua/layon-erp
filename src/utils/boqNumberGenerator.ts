@@ -56,34 +56,57 @@ function generateNextBOQNumberSync(existingBOQs: Array<{ number: string }>): str
 }
 
 /**
- * Asynchronous version - fetches from both boqs and lcl_boqs tables
+ * Asynchronous version - fetches MAX() from both boqs and lcl_boqs tables
  */
 async function generateNextBOQNumberAsync(
   existingBOQs: Array<{ number: string }> | undefined,
   companyId: string
 ): Promise<string> {
-  let allBOQs: Array<{ number: string }> = existingBOQs || [];
+  let maxNumber = 0;
 
   try {
     const [boqsResult, lclBoqsResult] = await Promise.all([
       supabase
         .from('boqs')
         .select('number')
-        .eq('company_id', companyId),
+        .eq('company_id', companyId)
+        .order('number', { ascending: false })
+        .limit(1),
       supabase
         .from('lcl_boqs')
         .select('number')
-        .eq('company_id', companyId),
+        .eq('company_id', companyId)
+        .order('number', { ascending: false })
+        .limit(1),
     ]);
 
-    allBOQs = [
-      ...(boqsResult.data || []),
-      ...(lclBoqsResult.data || []),
-    ];
+    const extractNumber = (boqNumber: string): number => {
+      const match = boqNumber.match(/^BOQ-(\d{1,3})$/);
+      return match ? parseInt(match[1], 10) : 0;
+    };
+
+    const boqsMax = boqsResult.data?.[0] ? extractNumber(boqsResult.data[0].number) : 0;
+    const lclBoqsMax = lclBoqsResult.data?.[0] ? extractNumber(lclBoqsResult.data[0].number) : 0;
+    maxNumber = Math.max(boqsMax, lclBoqsMax);
   } catch (error) {
     console.error('Error fetching BOQ numbers:', error);
-    allBOQs = existingBOQs || [];
+    maxNumber = 0;
   }
 
-  return generateNextBOQNumberSync(allBOQs);
+  // Apply local BOQs if provided
+  if (existingBOQs && existingBOQs.length > 0) {
+    existingBOQs.forEach((boq) => {
+      const match = boq.number.match(/^BOQ-(\d{1,3})$/);
+      if (match && match[1]) {
+        const numericPart = parseInt(match[1], 10);
+        if (!isNaN(numericPart) && numericPart > maxNumber) {
+          maxNumber = numericPart;
+        }
+      }
+    });
+  }
+
+  const nextNumber = maxNumber + 1;
+  const formattedNumber = String(nextNumber).padStart(3, '0');
+  return `BOQ-${formattedNumber}`;
 }

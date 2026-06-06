@@ -35,6 +35,25 @@ class LCLBOQService {
   }
 
   /**
+   * Get the latest (most recent) LCL BOQ for a company
+   */
+  async getLCLBOQLatest(companyId: string): Promise<LCLBOQRecord | null> {
+    const { data, error } = await supabase
+      .from('lcl_boqs')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      throw error;
+    }
+
+    return (data || null) as LCLBOQRecord | null;
+  }
+
+  /**
    * Get a single LCL BOQ by ID
    */
   async getLCLBOQ(id: string): Promise<LCLBOQRecord> {
