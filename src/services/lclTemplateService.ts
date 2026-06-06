@@ -506,6 +506,19 @@ export class LCLTemplateService {
     });
   }
 
+  deleteEmptySections(
+    sections: any[]
+  ): any[] {
+    return sections.filter((section) => {
+      for (const subsection of section.subsections || []) {
+        if (subsection.id) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }
+
   async recordHistory(
     structureId: string,
     companyId: string,
