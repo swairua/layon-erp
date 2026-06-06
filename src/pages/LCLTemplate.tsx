@@ -21,13 +21,13 @@ import {
 import { Download, Save } from 'lucide-react';
 
 export default function LCLTemplate() {
-  console.log('[LCLTemplate] Component mounted');
+  console.log('[LCLTemplate] ✅ Component MOUNTED - render started');
   const { currentCompany, isLoading: isCompanyLoading } = useCurrentCompany();
   const companyId = currentCompany?.id || '';
   const { toast } = useToast();
   const { data: customers } = useCustomers(companyId);
 
-  console.log(`[LCLTemplate] Company context - isLoading: ${isCompanyLoading}, companyId: ${companyId}`);
+  console.log(`[LCLTemplate] Company context loaded - isLoading: ${isCompanyLoading}, companyId: "${companyId}", currentCompany: ${currentCompany ? currentCompany.name : 'null'}`);
 
   const [hierarchicalData, setHierarchicalData] =
     useState<LCLHierarchicalData | null>(null);
@@ -46,6 +46,13 @@ export default function LCLTemplate() {
 
   const [initialItems, setInitialItems] = useState<ItemSnapshot[]>([]);
   const [structureId, setStructureId] = useState<string>('');
+
+  // Prevent accidental unmounting/cleanup
+  useEffect(() => {
+    return () => {
+      console.log('[LCLTemplate] ⚠️ Component UNMOUNTING - this should not happen unless navigating away');
+    };
+  }, []);
 
   const loadLCLBOQData = useCallback(async () => {
     if (!companyId) {
@@ -296,14 +303,18 @@ export default function LCLTemplate() {
   };
 
   useEffect(() => {
-    console.log(`[LCLTemplate] useEffect triggered - isCompanyLoading: ${isCompanyLoading}`);
+    console.log(`[LCLTemplate] useEffect triggered - isCompanyLoading: ${isCompanyLoading}, companyId: "${companyId}"`);
     if (isCompanyLoading) {
-      console.log('[LCLTemplate] Company still loading, skipping loadLCLBOQData');
+      console.log('[LCLTemplate] ⏳ Company still loading, skipping loadLCLBOQData until company context ready');
       return;
     }
-    console.log('[LCLTemplate] Calling loadLCLBOQData');
+    if (!companyId) {
+      console.warn('[LCLTemplate] ⚠️ Company ID is empty, waiting for company context to populate');
+      return;
+    }
+    console.log('[LCLTemplate] 📊 Company ready, calling loadLCLBOQData');
     loadLCLBOQData();
-  }, [loadLCLBOQData, isCompanyLoading]);
+  }, [loadLCLBOQData, isCompanyLoading, companyId]);
 
   // Autosave header fields to localStorage (2s debounce)
   useEffect(() => {
@@ -348,17 +359,24 @@ export default function LCLTemplate() {
   if (loading || isCompanyLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground">Loading LCL BOQ...</p>
+        <div className="text-center space-y-2">
+          <p className="text-muted-foreground">Loading LCL BOQ...</p>
+          {isCompanyLoading && <p className="text-xs text-muted-foreground/70">Waiting for company context...</p>}
+          {loading && companyId && <p className="text-xs text-muted-foreground/70">Loading data for company: {companyId}</p>}
+        </div>
       </div>
     );
   }
 
   if (!hierarchicalData) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <p className="text-muted-foreground mb-4">
-          Unable to load LCL BOQ structure.
-        </p>
+      <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
+        <div>
+          <p className="text-muted-foreground mb-2">
+            Unable to load LCL BOQ structure.
+          </p>
+          <p className="text-xs text-muted-foreground/70">Company: {companyId || 'Not loaded'}</p>
+        </div>
         <Button onClick={loadLCLBOQData}>Try Again</Button>
       </div>
     );
