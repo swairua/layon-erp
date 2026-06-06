@@ -101,6 +101,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
 
+  // Log storage availability once on mount
+  useEffect(() => {
+    try {
+      const testKey = '__auth_test__';
+      const isStorageAvailable = typeof window !== 'undefined' &&
+        window.localStorage !== undefined;
+
+      if (isStorageAvailable) {
+        try {
+          window.localStorage.setItem(testKey, 'test');
+          const value = window.localStorage.getItem(testKey);
+          window.localStorage.removeItem(testKey);
+          console.log('✅ [AuthContext] localStorage is working - can read/write/remove');
+        } catch (e) {
+          console.warn('⚠️ [AuthContext] localStorage exists but is blocked:', e instanceof Error ? e.message : String(e));
+        }
+      } else {
+        console.warn('⚠️ [AuthContext] localStorage not available');
+      }
+
+      // Check if auth token already exists in localStorage
+      const existingToken = window.localStorage?.getItem('sb-auth-token');
+      if (existingToken) {
+        console.log('📋 [AuthContext] Found existing sb-auth-token in localStorage');
+      } else {
+        console.log('📋 [AuthContext] No sb-auth-token in localStorage yet');
+      }
+    } catch (e) {
+      console.warn('⚠️ [AuthContext] Error checking storage:', e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
   // Use refs to prevent stale closures and unnecessary re-renders
   const mountedRef = useRef(true);
   const initializingRef = useRef(false);
@@ -318,7 +350,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const initializeAuthState = async () => {
       try {
-        console.log('🚀 Starting auth initialization...');
+        console.log('🚀 [AuthContext] Starting auth initialization...');
+
+        // Log current localStorage state
+        try {
+          const storedToken = window.localStorage?.getItem('sb-auth-token');
+          console.log('📋 [AuthContext] Checking localStorage for sb-auth-token:', storedToken ? 'Found' : 'Not found');
+        } catch (e) {
+          console.warn('⚠️ [AuthContext] Cannot access localStorage:', e instanceof Error ? e.message : String(e));
+        }
 
         // Simple session check with timeout
         const sessionTimeoutPromise = new Promise((_, reject) => {
@@ -326,13 +366,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         });
 
         try {
+          console.log('📡 [AuthContext] Calling supabase.auth.getSession()...');
           const { data: sessionData } = await Promise.race([
             supabase.auth.getSession(),
             sessionTimeoutPromise
           ]) as any;
 
           if (sessionData?.session?.user && mountedRef.current) {
-            console.log('✅ Session found, setting auth state');
+            console.log('✅ [AuthContext] Session found, user:', sessionData.session.user.email);
+            console.log('📋 [AuthContext] Session tokens:', {
+              hasAccessToken: !!sessionData.session.access_token,
+              hasRefreshToken: !!sessionData.session.refresh_token,
+              expiresAt: sessionData.session.expires_at
+            });
             setSession(sessionData.session);
             setUser(sessionData.session.user);
 
@@ -374,7 +420,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               });
           }
         } catch (sessionError) {
-          console.log('ℹ️ No active session');
+          const errorMsg = sessionError instanceof Error ? sessionError.message : String(sessionError);
+          console.log('ℹ️ [AuthContext] No active session:', errorMsg);
         }
 
         completeInit();
@@ -400,14 +447,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [fetchProfile, handleAuthStateChange]);
 
   const signIn = useCallback(async (email: string, password: string) => {
+    console.log(`🔐 [AuthContext] Starting sign in for: ${email}`);
+
     const hardTimeoutId = setTimeout(() => {
-      console.warn('⚠️ Sign-in hard timeout (3s): forcing loading state clear');
+      console.warn('⚠️ [AuthContext] Sign-in hard timeout (3s): forcing loading state clear');
       if (mountedRef.current) {
         setLoading(false);
       }
     }, 3000);
 
     const { data, error } = await safeAuthOperation(async () => {
+      console.log(`📝 [AuthContext] Calling supabase.auth.signInWithPassword for ${email}...`);
       setLoading(true);
       return await supabase.auth.signInWithPassword({
         email,
@@ -416,6 +466,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }, 'signIn');
 
     if (error) {
+      console.error(`❌ [AuthContext] Sign-in error:`, error);
       clearTimeout(hardTimeoutId);
       setLoading(false);
       // Ensure error is a proper Error object with a message property
@@ -425,6 +476,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     if (data?.error) {
+      console.error(`❌ [AuthContext] Sign-in returned error:`, data.error);
       clearTimeout(hardTimeoutId);
       setLoading(false);
       // Ensure error is a proper Error object with a message property
@@ -438,7 +490,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const session = (data as any)?.data?.session;
       const signedInUser = session?.user;
       if (signedInUser) {
-        console.log('📝 Setting session and user state after sign in');
+        console.log(`✅ [AuthContext] Sign-in successful for: ${signedInUser.email}`);
+        console.log('📋 [AuthContext] Session tokens:', {
+          hasAccessToken: !!session?.access_token,
+          hasRefreshToken: !!session?.refresh_token,
+          expiresAt: session?.expires_at
+        });
+
+        // Check if token is stored in localStorage
+        try {
+          const storedToken = window.localStorage?.getItem('sb-auth-token');
+          console.log('📦 [AuthContext] sb-auth-token in localStorage after sign-in:', storedToken ? 'Present' : 'Missing');
+        } catch (e) {
+          console.warn('⚠️ [AuthContext] Cannot check localStorage after sign-in:', e instanceof Error ? e.message : String(e));
+        }
+
+        console.log('📝 [AuthContext] Setting session and user state after sign in');
         setSession(session);
         setUser(signedInUser);
 

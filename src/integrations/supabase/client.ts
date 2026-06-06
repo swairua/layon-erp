@@ -2,11 +2,17 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Hardcoded Supabase credentials for project eubrvlzkvzevidivsfha
-export const SUPABASE_URL = 'https://eubrvlzkvzevidivsfha.supabase.co';
-export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_NlYHzHOT9LzEHgNuNfk_Ag_JBvPUWKF';
+// Use environment variables for Supabase credentials
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://klifzjcfnlaxminytmyh.supabase.co';
+export const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsaWZ6amNmbmxheG1pbnl0bXloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2ODg5NzcsImV4cCI6MjA3MTI2NDk3N30.kY9eVUh2hKZvOgixYTwggsznN4gD1ktNX4phXQ5TTdU';
 
-console.log('✅ Supabase client initializing with URL:', SUPABASE_URL.substring(0, 30) + '...');
+console.log('✅ [Supabase] Client initializing');
+console.log('📍 [Supabase] URL:', SUPABASE_URL);
+console.log('🔑 [Supabase] Using environment variables:', {
+  hasUrl: !!import.meta.env.VITE_SUPABASE_URL,
+  hasKey: !!import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  env: import.meta.env.MODE
+});
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
@@ -14,8 +20,19 @@ console.log('✅ Supabase client initializing with URL:', SUPABASE_URL.substring
 // Safely get localStorage only if in browser environment
 const getStorage = () => {
   if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
-    return window.localStorage;
+    try {
+      // Test if localStorage is accessible by trying to set/get/remove a test key
+      const testKey = '__storage_test__';
+      window.localStorage.setItem(testKey, 'test');
+      window.localStorage.removeItem(testKey);
+      console.log('✅ [Supabase] localStorage is available and accessible');
+      return window.localStorage;
+    } catch (e) {
+      console.warn('⚠️ [Supabase] localStorage is blocked or unavailable:', e instanceof Error ? e.message : String(e));
+      return undefined;
+    }
   }
+  console.warn('⚠️ [Supabase] Not in browser environment or localStorage not available');
   return undefined;
 };
 
