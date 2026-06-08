@@ -2,29 +2,28 @@ import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Check if a database function exists
+ * NOTE: information_schema.routines is not exposed via Supabase REST API
+ * This now attempts to call the function directly instead
  */
 export async function checkDatabaseFunction(functionName: string): Promise<{
   exists: boolean;
   error?: string;
 }> {
   try {
-    // Query the information_schema to check if function exists
-    const { data, error } = await supabase
-      .from('information_schema.routines')
-      .select('routine_name')
-      .eq('routine_name', functionName)
-      .eq('routine_type', 'FUNCTION')
-      .limit(1);
+    // Try calling the function with dummy params to check if it exists
+    const { error } = await supabase.rpc(functionName, { company_uuid: '00000000-0000-0000-0000-000000000000' });
 
-    if (error) {
-      console.error(`Error checking function ${functionName}:`, error);
-      return { exists: false, error: error.message };
+    // If we get a "function does not exist" error, the function is missing
+    // Any other error means the function exists but failed on params
+    if (error?.code === 'PGRST202' || error?.message?.includes('does not exist')) {
+      return { exists: false, error: error?.message };
     }
 
-    return { exists: data && data.length > 0 };
+    // Function exists (either succeeded or failed for other reasons)
+    return { exists: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`Error checking function ${functionName}:`, errorMessage);
+    // If we can't reach RPC, assume function doesn't exist
     return { exists: false, error: errorMessage };
   }
 }

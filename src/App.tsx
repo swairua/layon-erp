@@ -253,7 +253,11 @@ const App = () => {
         }
 
         // Verify invoice RLS policy doesn't have infinite recursion
-        await verifyInvoiceRLSFix();
+        try {
+          await verifyInvoiceRLSFix();
+        } catch (err) {
+          console.warn('⚠️ Could not verify invoice RLS fix', err);
+        }
 
         // Fix quotations RLS policy issue
         try {
@@ -295,7 +299,7 @@ const App = () => {
           console.warn('⚠️ Could not verify database indexes (non-critical):', err);
         }
       } catch (error) {
-        console.warn('Database schema verification completed with issues (non-critical)', error);
+        console.warn('Database initialization completed with issues (non-critical)', error);
       }
     })();
   }, []);

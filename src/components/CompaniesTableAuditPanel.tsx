@@ -34,22 +34,8 @@ export function CompaniesTableAuditPanel() {
         throw new Error(`Failed to fetch companies: ${companiesError.message}`);
       }
 
-      // Check for users associated with companies
-      const { data: users, error: usersError } = await supabase
-        .from('auth.users')
-        .select('user_metadata');
-
-      const companyIds = companies?.map(c => c.id) || [];
+      // Note: auth.users is not accessible via REST API, so we skip user association check
       const companiesWithUsers = new Set();
-      
-      if (users) {
-        users.forEach(user => {
-          const companyId = user.user_metadata?.company_id;
-          if (companyId && companyIds.includes(companyId)) {
-            companiesWithUsers.add(companyId);
-          }
-        });
-      }
 
       // Check for duplicate names
       const names = companies?.map(c => c.name?.toLowerCase()) || [];
