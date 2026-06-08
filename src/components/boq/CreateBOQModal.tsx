@@ -29,7 +29,7 @@ import { CreateUnitModal } from '@/components/units/CreateUnitModal';
 import { BOQSaveIndicator } from '@/components/boq/BOQSaveIndicator';
 import { toast } from 'sonner';
 import { downloadBOQPDF, BoqDocument } from '@/utils/boqPdfGenerator';
-import { generateNextBOQNumber } from '@/utils/boqNumberGenerator';
+import { generateNextBOQNumber, invalidateBOQNumberCache } from '@/utils/boqNumberGenerator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { saveBoqDraft, loadBoqDraft, deleteDraft, isDraftStale, cleanupDuplicateDrafts } from '@/services/boqAutoSaveService';
@@ -629,6 +629,11 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
       } : undefined);
 
       toast.success(`BOQ ${boqNumber} generated and saved`);
+
+      // Invalidate BOQ number cache since a new BOQ was created
+      if (currentCompany?.id) {
+        invalidateBOQNumberCache(currentCompany.id);
+      }
 
       // Clear draft from database and reset form state after successful save
       if (profile?.id && currentCompany?.id) {

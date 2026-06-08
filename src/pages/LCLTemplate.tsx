@@ -65,7 +65,7 @@ export default function LCLTemplate() {
     setLoading(true);
     console.log(`[LCLTemplate] Loading LCL BOQ data for company: ${companyId}`);
     try {
-      // Load the default LCL BOQ structure for this company
+      // Phase 1: Load structures (critical path blocker)
       const structures = await lclTemplateService.getStructures(companyId);
       console.log(`[LCLTemplate] Loaded structures: ${structures.length} structure(s) - ${structures.map((s) => s.name).join(', ')}`);
 
@@ -88,20 +88,18 @@ export default function LCLTemplate() {
         return;
       }
 
-      // Load hierarchical data for the default structure
+      // Phase 2: Load hierarchical data and secondary data (latest BOQ + next number) in parallel
       console.log(`[LCLTemplate] Loading hierarchical data for structure ID: ${lclDefaultStructure.id}`);
-      const data =
-        await lclTemplateService.getHierarchicalData(lclDefaultStructure.id, lclDefaultStructure);
-      console.log(`[LCLTemplate] Hierarchical data loaded successfully`);
-      setHierarchicalData(data);
-      setStructureId(lclDefaultStructure.id);
-
-      // Parallelize loading of latest BOQ and next BOQ number (both independent)
       try {
-        const [latestBoq, nextNumber] = await Promise.all([
+        const [data, latestBoq, nextNumber] = await Promise.all([
+          lclTemplateService.getHierarchicalData(lclDefaultStructure.id, lclDefaultStructure),
           lclBoqService.getLCLBOQLatest(companyId),
           generateNextBOQNumber(undefined, companyId),
         ]);
+
+        console.log(`[LCLTemplate] Hierarchical data loaded successfully`);
+        setHierarchicalData(data);
+        setStructureId(lclDefaultStructure.id);
 
         if (latestBoq && latestBoq.items_snapshot && latestBoq.items_snapshot.length > 0) {
           setInitialItems(latestBoq.items_snapshot);
@@ -109,8 +107,12 @@ export default function LCLTemplate() {
 
         setBoqNumber(nextNumber);
       } catch (parallelError) {
-        console.log('Note: Error loading latest BOQ or generating BOQ number:', parallelError);
+        console.log('Note: Error loading hierarchical data or generating BOQ number:', parallelError);
         setBoqNumber('BOQ-001');
+        // Continue with empty hierarchical data if that also failed
+        if (!hierarchicalData) {
+          throw parallelError;
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to load LCL BOQ';
@@ -123,7 +125,7 @@ export default function LCLTemplate() {
     } finally {
       setLoading(false);
     }
-  }, [companyId, toast]);
+  }, [companyId, toast, hierarchicalData]);
 
   const handleSaveLCLBOQ = async () => {
     if (!hierarchicalData || !companyId) return;

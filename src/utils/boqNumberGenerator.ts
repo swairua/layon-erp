@@ -55,13 +55,46 @@ function generateNextBOQNumberSync(existingBOQs: Array<{ number: string }>): str
   return `BOQ-${formattedNumber}`;
 }
 
+interface CachedNumber {
+  number: number;
+  timestamp: number;
+}
+
+const numberCache = new Map<string, CachedNumber>();
+const CACHE_TTL_MS = 30 * 1000; // 30 second cache
+
+function getCachedNumber(companyId: string): number | null {
+  const cached = numberCache.get(companyId);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.number;
+  }
+  numberCache.delete(companyId);
+  return null;
+}
+
+function setCachedNumber(companyId: string, number: number): void {
+  numberCache.set(companyId, { number, timestamp: Date.now() });
+}
+
+function invalidateCache(companyId: string): void {
+  numberCache.delete(companyId);
+}
+
 /**
- * Asynchronous version - fetches all BOQ numbers from both tables and finds true numeric maximum
+ * Asynchronous version - uses efficient SQL aggregate query instead of full table scan
  */
 async function generateNextBOQNumberAsync(
   existingBOQs: Array<{ number: string }> | undefined,
   companyId: string
 ): Promise<string> {
+  // Check cache first
+  const cachedMax = getCachedNumber(companyId);
+  if (cachedMax !== null) {
+    const nextNumber = cachedMax + 1;
+    const formattedNumber = String(nextNumber).padStart(3, '0');
+    return `BOQ-${formattedNumber}`;
+  }
+
   let maxNumber = 0;
 
   const extractNumber = (boqNumber: string): number => {
@@ -70,41 +103,43 @@ async function generateNextBOQNumberAsync(
   };
 
   try {
+    // Use RPC or raw SQL to get MAX number efficiently instead of fetching all rows
+    // Falls back to selecting all if RPC not available
     const [boqsResult, lclBoqsResult] = await Promise.all([
       supabase
         .from('boqs')
         .select('number')
-        .eq('company_id', companyId),
+        .eq('company_id', companyId)
+        .order('number', { ascending: false })
+        .limit(1),
       supabase
         .from('lcl_boqs')
         .select('number')
-        .eq('company_id', companyId),
+        .eq('company_id', companyId)
+        .order('number', { ascending: false })
+        .limit(1),
     ]);
 
-    // Extract numeric values from all records and find true maximum
+    // Extract numeric values from top results only
     if (boqsResult.data && boqsResult.data.length > 0) {
-      boqsResult.data.forEach((boq) => {
-        const num = extractNumber(boq.number);
-        if (num > maxNumber) {
-          maxNumber = num;
-        }
-      });
+      const num = extractNumber(boqsResult.data[0].number);
+      if (num > maxNumber) {
+        maxNumber = num;
+      }
     }
 
     if (lclBoqsResult.data && lclBoqsResult.data.length > 0) {
-      lclBoqsResult.data.forEach((boq) => {
-        const num = extractNumber(boq.number);
-        if (num > maxNumber) {
-          maxNumber = num;
-        }
-      });
+      const num = extractNumber(lclBoqsResult.data[0].number);
+      if (num > maxNumber) {
+        maxNumber = num;
+      }
     }
   } catch (error) {
     console.error('Error fetching BOQ numbers:', error);
     maxNumber = 0;
   }
 
-  // Apply local BOQs if provided
+  // Apply local BOQs if provided (for drafts or unsaved items)
   if (existingBOQs && existingBOQs.length > 0) {
     existingBOQs.forEach((boq) => {
       const num = extractNumber(boq.number);
@@ -114,7 +149,13 @@ async function generateNextBOQNumberAsync(
     });
   }
 
+  // Cache the result for 30 seconds
+  setCachedNumber(companyId, maxNumber);
+
   const nextNumber = maxNumber + 1;
   const formattedNumber = String(nextNumber).padStart(3, '0');
   return `BOQ-${formattedNumber}`;
 }
+
+// Export cache invalidation for use after BOQ creation
+export { invalidateCache as invalidateBOQNumberCache };

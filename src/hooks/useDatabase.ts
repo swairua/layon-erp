@@ -246,15 +246,8 @@ export const useCompanies = () => {
   return useQuery({
     queryKey: ['companies'],
     queryFn: async () => {
-      // Ensure company image columns exist in the database
-      // This handles the case where migrations haven't been applied yet
-      try {
-        await ensureCompanyImageColumns();
-      } catch (err) {
-        // If column ensure fails, continue anyway - the columns might already exist
-        console.warn('Could not ensure company image columns, continuing...', err);
-      }
-
+      // NOTE: ensureCompanyImageColumns() is now called once at app startup in App.tsx
+      // This avoids expensive per-hook RPC calls and improves performance significantly
       const { data, error } = await supabase
         .from('companies')
         .select('*')

@@ -14,6 +14,8 @@ import { verifyRLSDisabled } from "@/utils/disableInvoiceRLS";
 import { fixRLSWithProperOrder, verifyRLSColumnFix } from "@/utils/fixRLSProperOrder";
 import { fixQuotationsRLS, verifyQuotationsRLS } from "@/utils/fixQuotationsRLS";
 import { ensureRLSPolicies } from "@/utils/ensureRLSPolicies";
+import { ensureCompanyImageColumns } from "@/utils/ensureDatabaseColumns";
+import { ensureDatabaseIndexes } from "@/utils/ensureDatabaseIndexes";
 
 // Lazy load the page components to reduce initial bundle size and startup time
 import { lazy, Suspense } from "react";
@@ -269,6 +271,28 @@ const App = () => {
           }
         } catch (err) {
           console.warn('⚠️ Could not automatically fix quotations RLS issue', err);
+        }
+
+        // Ensure company image columns exist once at app startup (avoids per-hook RPC calls)
+        try {
+          console.log('📋 Ensuring company database columns are configured...');
+          await ensureCompanyImageColumns();
+          console.log('✅ Company columns are configured');
+        } catch (err) {
+          console.warn('⚠️ Could not ensure company image columns (non-critical):', err);
+        }
+
+        // Log information about database indexes (performance optimization)
+        try {
+          console.log('📊 Checking database indexes for BOQ/LCL performance...');
+          const indexResult = await ensureDatabaseIndexes();
+          if (indexResult.success) {
+            console.log('✅ ' + indexResult.message);
+          } else {
+            console.warn('⚠️ ' + indexResult.message);
+          }
+        } catch (err) {
+          console.warn('⚠️ Could not verify database indexes (non-critical):', err);
         }
       } catch (error) {
         console.warn('Database schema verification completed with issues (non-critical)', error);
