@@ -373,25 +373,31 @@ export function EditLCLBOQModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <DialogTitle>Edit LCL BOQ - {boq.number}</DialogTitle>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <DialogTitle>Edit LCL BOQ</DialogTitle>
               <p className="text-sm text-muted-foreground mt-1">
                 {sections.length} section{sections.length !== 1 ? 's' : ''} &mdash; click to expand/collapse
               </p>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleDownloadPDF}
-              disabled={downloading}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              {downloading ? 'Downloading...' : 'Download PDF'}
-            </Button>
+            <div className="flex items-center gap-2">
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">BOQ Number</p>
+                <p className="text-sm font-semibold">{boq.number}</p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleDownloadPDF}
+                disabled={downloading}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {downloading ? 'Downloading...' : 'Download PDF'}
+              </Button>
+            </div>
           </div>
           <DialogDescription>
-            Edit line items below. Changes are saved automatically.
+            Edit line items below. BOQ number and other header details cannot be changed.
           </DialogDescription>
         </DialogHeader>
 
