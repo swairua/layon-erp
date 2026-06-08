@@ -1,8 +1,9 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/lib/supabase';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -16,9 +17,42 @@ export function ProtectedRoute({
   requireAuth = true,
 }: ProtectedRouteProps) {
   const { isAuthenticated, loading } = useAuth();
+  const [sessionVerified, setSessionVerified] = useState(false);
+  const [verifyingSession, setVerifyingSession] = useState(false);
 
-  // Show loading state
-  if (loading) {
+  useEffect(() => {
+    // If context says we're authenticated, no need to verify
+    if (isAuthenticated) {
+      setSessionVerified(true);
+      return;
+    }
+
+    // If still loading, wait for initial load
+    if (loading) {
+      return;
+    }
+
+    // If loading is complete and we're not authenticated, verify Supabase session as fallback
+    const verifySuperbaseSession = async () => {
+      setVerifyingSession(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          console.log('✅ [ProtectedRoute] Session verified via Supabase fallback');
+          setSessionVerified(true);
+        }
+      } catch (error) {
+        console.error('[ProtectedRoute] Error verifying session:', error);
+      } finally {
+        setVerifyingSession(false);
+      }
+    };
+
+    verifySuperbaseSession();
+  }, [isAuthenticated, loading]);
+
+  // Show loading state while checking session
+  if (loading || verifyingSession) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -29,8 +63,8 @@ export function ProtectedRoute({
     );
   }
 
-  // Check authentication
-  if (requireAuth && !isAuthenticated) {
+  // Check authentication: context state OR verified session
+  if (requireAuth && !isAuthenticated && !sessionVerified) {
     return fallback || (
       <div className="flex items-center justify-center min-h-[400px]">
         <Card className="w-full max-w-md text-center">
