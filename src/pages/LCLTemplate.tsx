@@ -125,7 +125,7 @@ export default function LCLTemplate() {
     } finally {
       setLoading(false);
     }
-  }, [companyId, toast, hierarchicalData]);
+  }, [companyId, toast]);
 
   const handleSaveLCLBOQ = async () => {
     if (!hierarchicalData || !companyId) return;
@@ -308,7 +308,7 @@ export default function LCLTemplate() {
     }
     console.log('[LCLTemplate] 📊 Calling loadLCLBOQData');
     loadLCLBOQData();
-  }, [loadLCLBOQData, isCompanyLoading, companyId]);
+  }, [isCompanyLoading, companyId]);
 
   // Autosave header fields to localStorage (2s debounce)
   useEffect(() => {
