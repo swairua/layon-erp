@@ -81,7 +81,8 @@ function invalidateCache(companyId: string): void {
 }
 
 /**
- * Asynchronous version - uses efficient SQL aggregate query instead of full table scan
+ * Asynchronous version - fetches all numbers and finds max in JavaScript
+ * to avoid lexicographic sorting issues from Supabase
  */
 async function generateNextBOQNumberAsync(
   existingBOQs: Array<{ number: string }> | undefined,
@@ -103,36 +104,36 @@ async function generateNextBOQNumberAsync(
   };
 
   try {
-    // Use RPC or raw SQL to get MAX number efficiently instead of fetching all rows
-    // Falls back to selecting all if RPC not available
+    // Fetch all numbers (no ordering) and find max in JavaScript
+    // to avoid lexicographic sorting issues in Supabase
     const [boqsResult, lclBoqsResult] = await Promise.all([
       supabase
         .from('boqs')
         .select('number')
-        .eq('company_id', companyId)
-        .order('number', { ascending: false })
-        .limit(1),
+        .eq('company_id', companyId),
       supabase
         .from('lcl_boqs')
         .select('number')
-        .eq('company_id', companyId)
-        .order('number', { ascending: false })
-        .limit(1),
+        .eq('company_id', companyId),
     ]);
 
-    // Extract numeric values from top results only
+    // Find numeric maximum across all results
     if (boqsResult.data && boqsResult.data.length > 0) {
-      const num = extractNumber(boqsResult.data[0].number);
-      if (num > maxNumber) {
-        maxNumber = num;
-      }
+      boqsResult.data.forEach((row) => {
+        const num = extractNumber(row.number);
+        if (num > maxNumber) {
+          maxNumber = num;
+        }
+      });
     }
 
     if (lclBoqsResult.data && lclBoqsResult.data.length > 0) {
-      const num = extractNumber(lclBoqsResult.data[0].number);
-      if (num > maxNumber) {
-        maxNumber = num;
-      }
+      lclBoqsResult.data.forEach((row) => {
+        const num = extractNumber(row.number);
+        if (num > maxNumber) {
+          maxNumber = num;
+        }
+      });
     }
   } catch (error) {
     console.error('Error fetching BOQ numbers:', error);
