@@ -104,33 +104,22 @@ let functionsChecked = false;
 export async function ensureDatabaseFunctionsExist() {
   // Only check once per session
   if (functionsChecked) return;
-  
+
   try {
     // Try to call generate_quotation_number with a dummy UUID to check if it exists
     const dummyUUID = '00000000-0000-0000-0000-000000000000';
-    const { error } = await supabase.rpc('generate_quotation_number', { 
-      company_uuid: dummyUUID 
+    const { error } = await supabase.rpc('generate_quotation_number', {
+      company_uuid: dummyUUID
     });
 
     if (error?.code === 'PGRST202') {
-      // Function doesn't exist, attempt to create it
-      console.log('⚠️ Database functions missing. Contacting server to initialize...');
-      
-      try {
-        // Use a POST request to a server endpoint that handles this
-        const response = await fetch('/api/init-db-functions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        
-        if (response.ok) {
-          console.log('✅ Database functions initialized');
-        } else {
-          console.warn('⚠️ Could not initialize database functions via API');
-        }
-      } catch (apiError) {
-        console.warn('⚠️ API endpoint for initializing functions not available. Ensure server-side initialization is set up.');
-      }
+      // Function doesn't exist
+      console.log('⚠️ Database functions missing. Manual setup may be required.');
+      console.log('Ensure the following functions are created in Supabase SQL Editor:');
+      console.log('- generate_quotation_number(UUID)');
+      console.log('- generate_invoice_number(UUID)');
+      console.log('- generate_remittance_number(UUID)');
+      console.log('- generate_proforma_number(UUID)');
     } else {
       console.log('✅ Database functions already exist');
     }

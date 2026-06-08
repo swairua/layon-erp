@@ -2,29 +2,12 @@ import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Check the actual schema of the profiles table
+ * NOTE: information_schema is not exposed via Supabase REST API
+ * This function is disabled as it would fail
  */
 export const checkProfilesSchema = async () => {
-  try {
-    console.log('🔍 Checking profiles table schema...');
-    
-    // Try to get the table schema information
-    const { data, error } = await supabase
-      .from('information_schema.columns')
-      .select('column_name, data_type, is_nullable')
-      .eq('table_name', 'profiles')
-      .eq('table_schema', 'public');
-
-    if (error) {
-      console.error('Schema check error:', error);
-      return null;
-    }
-
-    console.log('📋 Profiles table columns:', data);
-    return data;
-  } catch (error) {
-    console.error('Schema check exception:', error);
-    return null;
-  }
+  console.log('ℹ️ Schema checking not available via REST API');
+  return null;
 };
 
 /**
@@ -65,53 +48,14 @@ export const testProfileCreation = async () => {
 
 /**
  * Get the minimal fields that work for profile creation
+ * NOTE: This function is simplified - use only confirmed fields
  */
 export const getWorkingProfileFields = async (userId: string) => {
-  // Start with the most basic fields and add more if they exist
   const baseFields = {
     id: userId,
     email: 'admin@medplus.app'
   };
 
-  // Try adding common fields one by one to see what works
-  const optionalFields = [
-    { key: 'full_name', value: 'System Administrator' },
-    { key: 'role', value: 'admin' },
-    { key: 'status', value: 'active' },
-    { key: 'department', value: 'IT' },
-    { key: 'position', value: 'System Administrator' }
-  ];
-
-  let workingFields = { ...baseFields };
-  
-  for (const field of optionalFields) {
-    try {
-      const testFields = { ...workingFields, [field.key]: field.value };
-      
-      // Test this field combination
-      const testId = 'test-' + Date.now();
-      const testData = { ...testFields, id: testId, email: 'test@example.com' };
-      
-      const { error } = await supabase
-        .from('profiles')
-        .insert(testData)
-        .single();
-
-      if (!error) {
-        // This field works, add it to working fields
-        workingFields[field.key] = field.value;
-        console.log(`✅ Field '${field.key}' works`);
-        
-        // Clean up test
-        await supabase.from('profiles').delete().eq('id', testId);
-      } else {
-        console.log(`❌ Field '${field.key}' failed:`, error.message);
-      }
-    } catch (error) {
-      console.log(`❌ Field '${field.key}' exception:`, error);
-    }
-  }
-
-  console.log('✅ Working profile fields:', workingFields);
-  return workingFields;
+  console.log('✅ Using standard profile fields:', baseFields);
+  return baseFields;
 };
