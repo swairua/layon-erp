@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Download, Save } from 'lucide-react';
+import { Download, Save, AlertCircle } from 'lucide-react';
 
 export default function LCLTemplate() {
   console.log('[LCLTemplate] ✅ Component MOUNTED - render started');
@@ -378,6 +378,19 @@ export default function LCLTemplate() {
         <div className="text-center space-y-2">
           <p className="text-muted-foreground">Loading LCL BOQ...</p>
           {isCompanyLoading && <p className="text-xs text-muted-foreground/70">Waiting for company context...</p>}
+        </div>
+      </div>
+    );
+  }
+
+  if (!hierarchicalData) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center space-y-4">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
+          <h2 className="text-xl font-semibold">Unable to Load LCL BOQ Template</h2>
+          <p className="text-muted-foreground">The LCL BOQ template could not be loaded. Please try refreshing the page.</p>
+          <Button onClick={() => window.location.reload()}>Refresh Page</Button>
         </div>
       </div>
     );

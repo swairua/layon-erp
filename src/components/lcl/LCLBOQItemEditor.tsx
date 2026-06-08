@@ -117,10 +117,10 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
       setDraftPending(false);
       setLastSavedTime(new Date().toISOString());
       try {
-        localStorage.removeItem(getDraftKey(data.structure_id));
+        localStorage.removeItem(getDraftKey(data?.structure_id || ''));
       } catch { /* ignore */ }
     },
-  }), [items, inlineEdits, data.structure_id]);
+  }), [items, inlineEdits, data?.structure_id]);
 
   const flattenHierarchyToSnapshot = (hierarchicalData: LCLHierarchicalData): ItemSnapshot[] => {
     const snapshot: ItemSnapshot[] = [];
@@ -168,7 +168,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
     let restoredLastSavedAt: string | null = null;
 
     try {
-      const raw = localStorage.getItem(getDraftKey(data.structure_id));
+      const raw = localStorage.getItem(getDraftKey(data?.structure_id || ''));
       if (raw) {
         const draft: AutosaveDraft = JSON.parse(raw);
         // Only restore if the draft has meaningful items (edits may be empty if user only added/removed items)
@@ -225,7 +225,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
           inlineEdits,
           lastSavedAt: new Date().toISOString(),
         };
-        localStorage.setItem(getDraftKey(data.structure_id), JSON.stringify(draft));
+        localStorage.setItem(getDraftKey(data?.structure_id || ''), JSON.stringify(draft));
         setLastSavedTime(draft.lastSavedAt);
         setDraftPending(false);
       } catch (error) {
@@ -243,7 +243,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
         clearTimeout(autosaveTimerRef.current);
       }
     };
-  }, [draftPending, items, inlineEdits, data.structure_id]);
+  }, [draftPending, items, inlineEdits, data?.structure_id]);
 
   // Cleanup autosave timer on unmount
   useEffect(() => {
