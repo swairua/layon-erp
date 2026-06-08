@@ -342,11 +342,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     };
 
-    // CRITICAL: Ensure initialization completes within 2 seconds no matter what
+    // CRITICAL: Ensure initialization completes within 1.5 seconds no matter what
     const hardTimeout = setTimeout(() => {
       console.warn('⚠️ Hard timeout: completing initialization');
       completeInit();
-    }, 2000);
+    }, 1500);
 
     const initializeAuthState = async () => {
       try {
@@ -362,7 +362,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Simple session check with timeout
         const sessionTimeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Session check timeout')), 800);
+          setTimeout(() => reject(new Error('Session check timeout')), 500);
         });
 
         try {
@@ -385,9 +385,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Fetch profile in background with timeout
             const profileTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
               setTimeout(() => {
-                console.warn('⏱️ Profile fetch timeout (1.5s)');
+                console.warn('⏱️ Profile fetch timeout (800ms)');
                 resolve(null);
-              }, 1500);
+              }, 800);
             });
 
             Promise.race([
@@ -450,11 +450,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log(`🔐 [AuthContext] Starting sign in for: ${email}`);
 
     const hardTimeoutId = setTimeout(() => {
-      console.warn('⚠️ [AuthContext] Sign-in hard timeout (3s): forcing loading state clear');
+      console.warn('⚠️ [AuthContext] Sign-in hard timeout (2s): forcing loading state clear');
       if (mountedRef.current) {
         setLoading(false);
       }
-    }, 3000);
+    }, 2000);
 
     const { data, error } = await safeAuthOperation(async () => {
       console.log(`📝 [AuthContext] Calling supabase.auth.signInWithPassword for ${email}...`);
@@ -514,9 +514,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // This ensures components render with correct role/email filtering
           const profileTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
             setTimeout(() => {
-              console.warn('⏱️ Profile fetch timeout during sign in (2s)');
+              console.warn('⏱️ Profile fetch timeout during sign in (1s)');
               resolve(null);
-            }, 2000); // 2 second timeout for sign in flow
+            }, 1000); // 1 second timeout for sign in flow
           });
 
           console.log('🔍 Starting profile fetch with 2s timeout...');
