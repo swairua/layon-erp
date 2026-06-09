@@ -27,6 +27,7 @@ export interface BOQDraftRecord {
   id: string;
   company_id: string;
   user_id: string;
+  draft_token: string;
   number: string;
   boq_date: string;
   due_date: string;
@@ -53,24 +54,25 @@ export interface BOQDraftRecord {
 
 /**
  * Save or update a BOQ draft to the database.
- * For create drafts (boq_id=null), loads existing draft first and updates by ID
- * to avoid NULL comparison issues with the unique constraint.
- * Only one draft per user per company is allowed (for creating new BOQs).
+ * For create drafts (boq_id=null), uses draft_token to support multiple
+ * concurrent create sessions per user/company.
+ * When draftToken is provided, the draft is scoped to that token.
  */
 export async function saveBoqDraft(
   userId: string,
   companyId: string,
-  formData: BOQDraftData
+  formData: BOQDraftData,
+  draftToken?: string
 ): Promise<{ success: boolean; error?: string; draftId?: string }> {
   try {
     if (!userId || !companyId) {
       return { success: false, error: 'User ID and Company ID are required' };
     }
 
-    console.log(`[saveBoqDraft] Attempting save for company: ${companyId}, user: ${userId}`);
+    console.log(`[saveBoqDraft] Attempting save for company: ${companyId}, user: ${userId}, token: ${draftToken || '(default)'}`);
 
     // Prepare the payload matching the boq_drafts table schema
-    const payload = {
+    const payload: Record<string, any> = {
       company_id: companyId,
       user_id: userId,
       boq_id: null,
@@ -100,56 +102,102 @@ export async function saveBoqDraft(
       last_autosaved_at: new Date().toISOString(),
     };
 
-    // Check if an existing create draft exists for this user/company
-    const { data: existingDraft, error: fetchError } = await supabase
-      .from('boq_drafts')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('company_id', companyId)
-      .is('boq_id', null)
-      .limit(1)
-      .single();
+    if (draftToken) {
+      payload.draft_token = draftToken;
+    }
 
     let draftId: string | undefined;
 
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      // Unexpected error (not "no rows found")
-      const errorMsg = fetchError instanceof Error ? fetchError.message : (fetchError?.message || JSON.stringify(fetchError));
-      console.error('[saveBoqDraft] Failed to check existing draft:', errorMsg);
-      return { success: false, error: errorMsg };
-    }
-
-    if (existingDraft?.id) {
-      // Update existing draft by ID
-      console.log(`[saveBoqDraft] Updating existing draft: ${existingDraft.id}`);
-      const { data, error } = await supabase
+    if (draftToken) {
+      // Scoped lookup by draft_token
+      const { data: existingDraft, error: fetchError } = await supabase
         .from('boq_drafts')
-        .update(payload)
-        .eq('id', existingDraft.id)
         .select('id')
-        .single();
+        .eq('draft_token', draftToken)
+        .eq('user_id', userId)
+        .eq('company_id', companyId)
+        .is('boq_id', null)
+        .maybeSingle();
 
-      if (error) {
-        const errorMsg = error instanceof Error ? error.message : (error?.message || JSON.stringify(error));
-        console.error('[saveBoqDraft] Update failed:', errorMsg);
+      if (fetchError) {
+        const errorMsg = fetchError instanceof Error ? fetchError.message : (fetchError?.message || JSON.stringify(fetchError));
+        console.error('[saveBoqDraft] Failed to check existing draft:', errorMsg);
         return { success: false, error: errorMsg };
       }
-      draftId = data?.id;
+
+      if (existingDraft?.id) {
+        const { data, error } = await supabase
+          .from('boq_drafts')
+          .update(payload)
+          .eq('id', existingDraft.id)
+          .select('id')
+          .single();
+
+        if (error) {
+          const errorMsg = error instanceof Error ? error.message : (error?.message || JSON.stringify(error));
+          console.error('[saveBoqDraft] Update failed:', errorMsg);
+          return { success: false, error: errorMsg };
+        }
+        draftId = data?.id;
+      } else {
+        const { data, error } = await supabase
+          .from('boq_drafts')
+          .insert([payload])
+          .select('id')
+          .single();
+
+        if (error) {
+          const errorMsg = error instanceof Error ? error.message : (error?.message || JSON.stringify(error));
+          console.error('[saveBoqDraft] Insert failed:', errorMsg);
+          return { success: false, error: errorMsg };
+        }
+        draftId = data?.id;
+      }
     } else {
-      // Insert new draft
-      console.log(`[saveBoqDraft] Creating new draft`);
-      const { data, error } = await supabase
+      // Fallback: single-slot lookup (backward compat, no draft token)
+      const { data: existingDraft, error: fetchError } = await supabase
         .from('boq_drafts')
-        .insert([payload])
         .select('id')
-        .single();
+        .eq('user_id', userId)
+        .eq('company_id', companyId)
+        .is('boq_id', null)
+        .limit(1)
+        .maybeSingle();
 
-      if (error) {
-        const errorMsg = error instanceof Error ? error.message : (error?.message || JSON.stringify(error));
-        console.error('[saveBoqDraft] Insert failed:', errorMsg);
+      if (fetchError) {
+        const errorMsg = fetchError instanceof Error ? fetchError.message : (fetchError?.message || JSON.stringify(fetchError));
+        console.error('[saveBoqDraft] Failed to check existing draft:', errorMsg);
         return { success: false, error: errorMsg };
       }
-      draftId = data?.id;
+
+      if (existingDraft?.id) {
+        const { data, error } = await supabase
+          .from('boq_drafts')
+          .update(payload)
+          .eq('id', existingDraft.id)
+          .select('id')
+          .single();
+
+        if (error) {
+          const errorMsg = error instanceof Error ? error.message : (error?.message || JSON.stringify(error));
+          console.error('[saveBoqDraft] Update failed:', errorMsg);
+          return { success: false, error: errorMsg };
+        }
+        draftId = data?.id;
+      } else {
+        const { data, error } = await supabase
+          .from('boq_drafts')
+          .insert([payload])
+          .select('id')
+          .single();
+
+        if (error) {
+          const errorMsg = error instanceof Error ? error.message : (error?.message || JSON.stringify(error));
+          console.error('[saveBoqDraft] Insert failed:', errorMsg);
+          return { success: false, error: errorMsg };
+        }
+        draftId = data?.id;
+      }
     }
 
     console.log(`[saveBoqDraft] Successfully saved/updated draft with ID: ${draftId}`);
@@ -162,13 +210,15 @@ export async function saveBoqDraft(
 }
 
 /**
- * Load the latest draft for a user and company.
- * Fetches the most recent draft (by updated_at) to handle duplicate edge cases.
+ * Load a draft for a user and company.
+ * If draftToken is provided, loads the draft for that specific token.
+ * Otherwise loads the most recent create draft (backward compat).
  * Returns null if no draft exists.
  */
 export async function loadBoqDraft(
   userId: string,
-  companyId: string
+  companyId: string,
+  draftToken?: string
 ): Promise<BOQDraftRecord | null> {
   try {
     if (!userId || !companyId) {
@@ -176,16 +226,22 @@ export async function loadBoqDraft(
       return null;
     }
 
-    console.log(`[loadBoqDraft] Attempting to load draft for user: ${userId}, company: ${companyId}`);
+    console.log(`[loadBoqDraft] Attempting to load draft for user: ${userId}, company: ${companyId}, token: ${draftToken || '(any)'}`);
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('boq_drafts')
       .select('*')
       .eq('user_id', userId)
       .eq('company_id', companyId)
-      .is('boq_id', null) // Only fetch create drafts, not edit drafts
-      .order('updated_at', { ascending: false }) // Get the most recent
-      .limit(1); // Only fetch one row
+      .is('boq_id', null);
+
+    if (draftToken) {
+      query = query.eq('draft_token', draftToken);
+    }
+
+    const { data, error } = await query
+      .order('updated_at', { ascending: false })
+      .limit(1);
 
     if (error) {
       const errorMsg = error instanceof Error ? error.message : (error?.message || JSON.stringify(error));
@@ -194,13 +250,8 @@ export async function loadBoqDraft(
     }
 
     if (!data || data.length === 0) {
-      console.log('[loadBoqDraft] No draft found for this user/company');
+      console.log('[loadBoqDraft] No draft found');
       return null;
-    }
-
-    // Log if we found duplicates (shouldn't happen after constraint fix)
-    if (data.length > 1) {
-      console.warn(`[loadBoqDraft] Found ${data.length} draft rows (should be max 1). Using most recent.`);
     }
 
     console.log(`[loadBoqDraft] Successfully loaded draft, last saved at: ${data[0].updated_at}`);
@@ -214,25 +265,32 @@ export async function loadBoqDraft(
 
 /**
  * Delete a draft from the database.
- * This is called when the user resets/clears the form.
+ * If draftToken is provided, deletes only the draft with that token.
  */
 export async function deleteDraft(
   userId: string,
-  companyId: string
+  companyId: string,
+  draftToken?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     if (!userId || !companyId) {
       return { success: false, error: 'User ID and Company ID are required' };
     }
 
-    console.log(`[deleteDraft] Deleting draft for user: ${userId}, company: ${companyId}`);
+    console.log(`[deleteDraft] Deleting draft for user: ${userId}, company: ${companyId}, token: ${draftToken || '(all)'}`);
 
-    const { error } = await supabase
+    let query = supabase
       .from('boq_drafts')
       .delete()
       .eq('user_id', userId)
       .eq('company_id', companyId)
-      .is('boq_id', null); // Only delete create drafts (use .is() for NULL comparison)
+      .is('boq_id', null);
+
+    if (draftToken) {
+      query = query.eq('draft_token', draftToken);
+    }
+
+    const { error } = await query;
 
     if (error) {
       const errorMsg = error instanceof Error ? error.message : (error?.message || JSON.stringify(error));
@@ -568,11 +626,63 @@ export async function hasDraft(
 }
 
 /**
- * Clean up duplicate draft rows, keeping only the most recent one.
- * This handles the edge case where duplicate drafts were created
- * before the UNIQUE constraint was properly applied.
- *
- * Should only be called if duplicates are detected.
+ * List all create drafts for a user/company.
+ * Uses DISTINCT ON (draft_token) to return one row per unique draft session.
+ * Returns an empty array if no drafts exist.
+ */
+export async function listCreateDrafts(
+  userId: string,
+  companyId: string
+): Promise<BOQDraftRecord[]> {
+  try {
+    if (!userId || !companyId) {
+      console.warn('[listCreateDrafts] User ID and Company ID are required');
+      return [];
+    }
+
+    console.log(`[listCreateDrafts] Fetching create drafts for user: ${userId}, company: ${companyId}`);
+
+    const { data, error } = await supabase
+      .from('boq_drafts')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('company_id', companyId)
+      .is('boq_id', null)
+      .order('draft_token', { ascending: true })
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('[listCreateDrafts] Query error:', error);
+      return [];
+    }
+
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    // Deduplicate by draft_token, keeping the most recent per token
+    const tokenMap = new Map<string, BOQDraftRecord>();
+    for (const row of data) {
+      const token = row.draft_token;
+      if (!tokenMap.has(token)) {
+        tokenMap.set(token, row as BOQDraftRecord);
+      }
+    }
+
+    const drafts = Array.from(tokenMap.values());
+    console.log(`[listCreateDrafts] Found ${drafts.length} unique create drafts`);
+    return drafts;
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[listCreateDrafts] Unexpected error:', errorMsg);
+    return [];
+  }
+}
+
+/**
+ * Clean up duplicate draft rows per draft_token, keeping only the most recent one.
+ * This handles the edge case where duplicate drafts exist within the same token
+ * (shouldn't happen after unique index, but safe to clean up).
  */
 export async function cleanupDuplicateDrafts(
   userId: string,
@@ -585,10 +695,9 @@ export async function cleanupDuplicateDrafts(
 
     console.log(`[cleanupDuplicateDrafts] Checking for duplicates for user: ${userId}, company: ${companyId}`);
 
-    // Fetch all create drafts for this user/company, sorted by updated_at DESC
     const { data: allDrafts, error: fetchError } = await supabase
       .from('boq_drafts')
-      .select('id')
+      .select('id, draft_token, updated_at')
       .eq('user_id', userId)
       .eq('company_id', companyId)
       .is('boq_id', null)
@@ -605,14 +714,29 @@ export async function cleanupDuplicateDrafts(
       return { success: true, deletedCount: 0 };
     }
 
-    // Keep the first (most recent) and delete the rest
-    const draftIdsToDelete = allDrafts.slice(1).map(d => d.id);
-    console.log(`[cleanupDuplicateDrafts] Found ${draftIdsToDelete.length} duplicate drafts to delete`);
+    // Keep the most recent per draft_token, delete the rest
+    const seenTokens = new Set<string>();
+    const idsToDelete: string[] = [];
+
+    for (const draft of allDrafts) {
+      if (seenTokens.has(draft.draft_token)) {
+        idsToDelete.push(draft.id);
+      } else {
+        seenTokens.add(draft.draft_token);
+      }
+    }
+
+    if (idsToDelete.length === 0) {
+      console.log('[cleanupDuplicateDrafts] No duplicates found');
+      return { success: true, deletedCount: 0 };
+    }
+
+    console.log(`[cleanupDuplicateDrafts] Found ${idsToDelete.length} duplicate drafts to delete`);
 
     const { error: deleteError } = await supabase
       .from('boq_drafts')
       .delete()
-      .in('id', draftIdsToDelete);
+      .in('id', idsToDelete);
 
     if (deleteError) {
       const errorMsg = deleteError instanceof Error ? deleteError.message : (deleteError?.message || JSON.stringify(deleteError));
@@ -620,8 +744,8 @@ export async function cleanupDuplicateDrafts(
       return { success: false, error: errorMsg };
     }
 
-    console.log(`[cleanupDuplicateDrafts] Successfully deleted ${draftIdsToDelete.length} duplicate drafts`);
-    return { success: true, deletedCount: draftIdsToDelete.length };
+    console.log(`[cleanupDuplicateDrafts] Successfully deleted ${idsToDelete.length} duplicate drafts`);
+    return { success: true, deletedCount: idsToDelete.length };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
     console.error('[cleanupDuplicateDrafts] Error:', errorMsg);

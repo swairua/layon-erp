@@ -32,7 +32,7 @@ import { downloadBOQPDF, BoqDocument } from '@/utils/boqPdfGenerator';
 import { generateNextBOQNumber, invalidateBOQNumberCache } from '@/utils/boqNumberGenerator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { saveBoqDraft, loadBoqDraft, deleteDraft, isDraftStale, cleanupDuplicateDrafts } from '@/services/boqAutoSaveService';
+import { saveBoqDraft, loadBoqDraft, deleteDraft, isDraftStale } from '@/services/boqAutoSaveService';
 
 // Safe UUID generator that works in all environments
 const generateSafeUUID = (): string => {
@@ -101,7 +101,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
   const { data: customers = [] } = useCustomers(currentCompany?.id);
   const { data: units = [] } = useUnits(currentCompany?.id);
   const { data: existingBOQs = [] } = useBOQs(currentCompany?.id, 'id, number');
-  const { profile } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
 
   const [unitModalOpen, setUnitModalOpen] = useState(false);
   const [pendingUnitTarget, setPendingUnitTarget] = useState<{ sectionId: string; itemId: string } | null>(null);
@@ -119,6 +119,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
   const pendingFormDataRef = useRef<any>(null);
   const lastProfileRef = useRef(profile);
   const formStateRef = useRef<any>({});
+  const draftTokenRef = useRef<string>(generateSafeUUID());
 
   const todayISO = new Date().toISOString().split('T')[0];
   const defaultNumber = useMemo(() => {
@@ -139,7 +140,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
   const [sections, setSections] = useState<BOQSectionRow[]>([defaultSection()]);
   const [submitting, setSubmitting] = useState(false);
 
-  // Update BOQ number when modal opens or when available BOQs change
+  // Update BOQ number when modal opens
   useEffect(() => {
     if (open) {
       setBoqNumber(defaultNumber);
@@ -174,12 +175,13 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
     if (open && previousTermsLoaded && !draftLoaded && currentCompany?.id && profile?.id) {
       const loadDraft = async () => {
         try {
-          const draft = await loadBoqDraft(profile.id, currentCompany.id);
+          const token = draftTokenRef.current;
+          const draft = await loadBoqDraft(profile.id, currentCompany.id, token);
           if (draft && draft.data) {
             // Check if draft is stale (>30 minutes old)
             if (isDraftStale(draft.last_autosaved_at, 30 * 60 * 1000)) {
               console.log('[CreateBOQModal] Draft is stale, deleting and starting fresh');
-              const deleteResult = await deleteDraft(profile.id, currentCompany.id);
+              const deleteResult = await deleteDraft(profile.id, currentCompany.id, token);
               if (!deleteResult.success) {
                 console.error('[CreateBOQModal] Failed to delete stale draft:', deleteResult.error);
               }
@@ -266,7 +268,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
         showCalculatedValuesInTerms: formData.showCalculatedValuesInTerms,
         currency: formData.currency,
         sections: formData.sections,
-      });
+      }, draftTokenRef.current);
 
       if (result.success) {
         setLastAutosavedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -495,6 +497,15 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
     if (!validate()) return;
     if (!selectedClient) { toast.error('Invalid client'); return; }
 
+    if (authLoading) {
+      toast.info('Please wait, authenticating user...');
+      return;
+    }
+    if (!profile?.id) {
+      toast.error('User not authenticated. Please sign in and try again.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const filledSections = getFilledItems();
@@ -637,7 +648,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
 
       // Clear draft from database and reset form state after successful save
       if (profile?.id && currentCompany?.id) {
-        const deleteResult = await deleteDraft(profile.id, currentCompany.id);
+        const deleteResult = await deleteDraft(profile.id, currentCompany.id, draftTokenRef.current);
         if (!deleteResult.success) {
           console.warn('Failed to delete draft after BOQ creation:', deleteResult.error);
           toast.warning('BOQ created but draft cleanup failed — you may see it again next time');
@@ -688,14 +699,9 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
 
     // Clear draft from database
     if (profile?.id && currentCompany?.id) {
-      const deleteResult = await deleteDraft(profile.id, currentCompany.id);
+      const deleteResult = await deleteDraft(profile.id, currentCompany.id, draftTokenRef.current);
 
-      // Also clean up any duplicate drafts that may exist
       if (deleteResult.success) {
-        const cleanupResult = await cleanupDuplicateDrafts(profile.id, currentCompany.id);
-        if (cleanupResult.deletedCount && cleanupResult.deletedCount > 0) {
-          console.log(`[handleClearForm] Cleaned up ${cleanupResult.deletedCount} duplicate drafts`);
-        }
         toast.success('Form cleared and draft reset');
       } else {
         toast.error('Failed to clear draft: ' + deleteResult.error);

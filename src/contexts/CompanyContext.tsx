@@ -1,6 +1,8 @@
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useContext, useMemo, useEffect } from 'react';
 import type { ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCompanies } from '@/hooks/useDatabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CompanyContextType {
   currentCompany: any | null;
@@ -11,7 +13,17 @@ interface CompanyContextType {
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
 export function CompanyProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuth();
   const { data: companies, isLoading, error } = useCompanies();
+
+  // Invalidate companies query when auth becomes active
+  // This handles the case where useCompanies cached an error from pre-login attempts
+  useEffect(() => {
+    if (isAuthenticated) {
+      queryClient.invalidateQueries({ queryKey: ['companies'] });
+    }
+  }, [isAuthenticated, queryClient]);
   const defaultCompanyId = import.meta.env.VITE_DEFAULT_COMPANY_ID?.trim();
   const defaultCompanyName = import.meta.env.VITE_DEFAULT_COMPANY_NAME?.trim().toLowerCase();
 

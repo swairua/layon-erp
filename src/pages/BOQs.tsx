@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,7 @@ import { useAuditLog } from '@/hooks/useAuditLog';
 import { useAuditedDeleteOperations } from '@/hooks/useAuditedDeleteOperations';
 import { useConvertBoqToInvoice } from '@/hooks/useBOQ';
 import { convertLCLBOQToInvoice } from '@/services/lclBoqService';
-import { loadBoqDraft, deleteDraft, cleanupDuplicateDrafts } from '@/services/boqAutoSaveService';
+import { listCreateDrafts, deleteDraft } from '@/services/boqAutoSaveService';
 import { generateUniqueInvoiceNumber } from '@/utils/invoiceNumberGenerator';
 import { toast } from 'sonner';
 import SEO from '@/components/SEO';
@@ -58,9 +58,7 @@ export default function BOQs() {
   const [editing, setEditing] = useState<any | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; boqId?: string; boqNumber?: string }>({ open: false });
   const [convertDialog, setConvertDialog] = useState<{ open: boolean; boqId?: string; boqNumber?: string; isLCL?: boolean }>({ open: false });
-  const [draftExists, setDraftExists] = useState(false);
-  const [draftLastSaved, setDraftLastSaved] = useState<string | null>(null);
-  const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const [createDrafts, setCreateDrafts] = useState<any[]>([]);
 
   // Helper function to refresh linked BOQ IDs
   const refreshLinkedBOQIds = async () => {
@@ -97,26 +95,16 @@ export default function BOQs() {
     }
   }, [searchParams]);
 
-  // Check for unsaved draft when company changes and cleanup duplicates
+  // Fetch all create drafts when company changes
   useEffect(() => {
-    const checkForDraft = async () => {
+    const checkForDrafts = async () => {
       if (companyId && profile?.id) {
-        // Cleanup duplicate drafts silently in the background
-        await cleanupDuplicateDrafts(profile.id, companyId);
-
-        const draft = await loadBoqDraft(profile.id, companyId);
-        if (draft) {
-          setDraftExists(true);
-          setDraftLastSaved(draft.last_autosaved_at);
-          setShowDraftBanner(true);
-        } else {
-          setDraftExists(false);
-          setShowDraftBanner(false);
-        }
+        const drafts = await listCreateDrafts(profile.id, companyId);
+        setCreateDrafts(drafts);
       }
     };
 
-    checkForDraft();
+    checkForDrafts();
   }, [companyId, profile?.id]);
 
   // Categorize BOQs by due date status
@@ -171,16 +159,21 @@ export default function BOQs() {
     toast.success('Filters cleared');
   };
 
+  const refreshCreateDrafts = useCallback(async () => {
+    if (companyId && profile?.id) {
+      const drafts = await listCreateDrafts(profile.id, companyId);
+      setCreateDrafts(drafts);
+    }
+  }, [companyId, profile?.id]);
+
   const handleResetDraft = async () => {
     if (profile?.id && companyId) {
       const result = await deleteDraft(profile.id, companyId);
       if (result.success) {
-        setDraftExists(false);
-        setShowDraftBanner(false);
-        setDraftLastSaved(null);
-        toast.success('Draft reset successfully');
+        setCreateDrafts([]);
+        toast.success('Drafts reset successfully');
       } else {
-        toast.error('Failed to reset draft');
+        toast.error('Failed to reset drafts');
       }
     }
   };
@@ -499,16 +492,20 @@ export default function BOQs() {
         </div>
       </div>
 
-      {showDraftBanner && draftExists && (
+      {createDrafts.length > 0 && (
         <Card className="border-blue-200 bg-blue-50 shadow-sm">
           <CardContent className="pt-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-3">
                 <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0" />
                 <div>
-                  <p className="font-medium text-blue-900 text-sm md:text-base">You have an unsaved BOQ in progress</p>
+                  <p className="font-medium text-blue-900 text-sm md:text-base">
+                    {createDrafts.length === 1
+                      ? 'You have an unsaved BOQ in progress'
+                      : `You have ${createDrafts.length} unsaved BOQs in progress`}
+                  </p>
                   <p className="text-xs md:text-sm text-blue-700">
-                    Last saved: {draftLastSaved ? new Date(draftLastSaved).toLocaleString() : 'just now'}
+                    Last saved: {new Date(createDrafts[0].last_autosaved_at).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -517,7 +514,6 @@ export default function BOQs() {
                   size="sm"
                   onClick={() => {
                     setOpen(true);
-                    setShowDraftBanner(false);
                   }}
                   className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
                 >
@@ -529,15 +525,7 @@ export default function BOQs() {
                   onClick={handleResetDraft}
                   className="border-blue-200 hover:bg-blue-100 w-full sm:w-auto"
                 >
-                  Reset Draft
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => setShowDraftBanner(false)}
-                  className="h-8 w-8 self-start sm:self-auto"
-                >
-                  <X className="h-4 w-4" />
+                  Reset {createDrafts.length > 1 ? 'All Drafts' : 'Draft'}
                 </Button>
               </div>
             </div>
@@ -821,10 +809,17 @@ export default function BOQs() {
         </CardContent>
       </Card>
 
-      <CreateBOQModal open={open} onOpenChange={setOpen} onSuccess={() => {
+      <CreateBOQModal open={open} onOpenChange={(newOpen) => {
+        setOpen(newOpen);
+        if (!newOpen) {
+          refreshCreateDrafts();
+        }
+      }} onSuccess={() => {
         refetchBOQs();
         refreshLinkedBOQIds();
+        refreshCreateDrafts();
       }} />
+
 
       <CreatePercentageCopyModal
         open={percentageCopyOpen}

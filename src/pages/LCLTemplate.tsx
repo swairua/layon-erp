@@ -126,6 +126,22 @@ export default function LCLTemplate() {
   const handleSaveLCLBOQ = async () => {
     if (!hierarchicalData || !companyId) return;
 
+    if (authLoading) {
+      toast({
+        title: 'Authenticating',
+        description: 'Please wait, authenticating user...',
+      });
+      return;
+    }
+    if (!isAuthenticated) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please sign in and try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const itemsSnapshot = editorRef.current?.getSnapshot();
     if (!itemsSnapshot || itemsSnapshot.length === 0) {
       toast({

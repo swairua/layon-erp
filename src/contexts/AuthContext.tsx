@@ -296,6 +296,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             );
           }
         }
+      } else if (event === 'SIGNED_OUT') {
+        // Debounce: verify session is truly gone before clearing state
+        // Prevents transient auto-refresh failures from logging the user out
+        await new Promise(resolve => setTimeout(resolve, 400));
+        const { data: verifyData } = await supabase.auth.getSession();
+        if (verifyData?.session?.user && mountedRef.current) {
+          console.log('[AuthContext] Ignoring transient SIGNED_OUT - session confirmed active');
+          setSession(verifyData.session);
+          setUser(verifyData.session.user);
+          return;
+        }
+        if (mountedRef.current) {
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+        }
       } else {
         if (mountedRef.current) {
           setSession(null);
