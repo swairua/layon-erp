@@ -176,12 +176,25 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
       const loadDraft = async () => {
         try {
           const token = draftTokenRef.current;
-          const draft = await loadBoqDraft(profile.id, currentCompany.id, token);
+          let draft = await loadBoqDraft(profile.id, currentCompany.id, token);
+          // Fallback: no draft matched current token, try most recent
+          if (!draft) {
+            draft = await loadBoqDraft(profile.id, currentCompany.id);
+            if (draft) {
+              if (draft.draft_token) {
+                draftTokenRef.current = draft.draft_token;
+              } else {
+                // Legacy draft without token: assign current token so future saves update it
+                await supabase.from('boq_drafts').update({ draft_token: draftTokenRef.current }).eq('id', draft.id);
+              }
+            }
+          }
           if (draft && draft.data) {
             // Check if draft is stale (>30 minutes old)
             if (isDraftStale(draft.last_autosaved_at, 30 * 60 * 1000)) {
               console.log('[CreateBOQModal] Draft is stale, deleting and starting fresh');
-              const deleteResult = await deleteDraft(profile.id, currentCompany.id, token);
+              const staleToken = draft.draft_token || token;
+              const deleteResult = await deleteDraft(profile.id, currentCompany.id, staleToken);
               if (!deleteResult.success) {
                 console.error('[CreateBOQModal] Failed to delete stale draft:', deleteResult.error);
               }
@@ -327,12 +340,12 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModal
     };
   }, [boqNumber, boqDate, dueDate, clientId, projectTitle, contractor, notes, termsAndConditions, showCalculatedValuesInTerms, currency, sections]);
 
-  // Autosave whenever form state changes
+  // Autosave whenever form state changes (after hydration is complete)
   useEffect(() => {
-    if (open && Object.keys(formStateRef.current).length > 0) {
+    if (open && draftLoaded && Object.keys(formStateRef.current).length > 0) {
       debouncedAutoSave();
     }
-  }, [open, boqNumber, boqDate, dueDate, clientId, projectTitle, contractor, notes, termsAndConditions, showCalculatedValuesInTerms, currency, sections, debouncedAutoSave]);
+  }, [open, draftLoaded, boqNumber, boqDate, dueDate, clientId, projectTitle, contractor, notes, termsAndConditions, showCalculatedValuesInTerms, currency, sections, debouncedAutoSave]);
 
   // Helper to mark changes and clear any previous errors for auto-retry
   const markChanged = useCallback(() => {

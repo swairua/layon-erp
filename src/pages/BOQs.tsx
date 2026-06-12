@@ -168,12 +168,26 @@ export default function BOQs() {
 
   const handleResetDraft = async () => {
     if (profile?.id && companyId) {
-      const result = await deleteDraft(profile.id, companyId);
-      if (result.success) {
+      let allSuccess = true;
+      let hasUntokenized = false;
+      for (const draft of createDrafts) {
+        if (draft.draft_token) {
+          const result = await deleteDraft(profile.id, companyId, draft.draft_token);
+          if (!result.success) allSuccess = false;
+        } else {
+          hasUntokenized = true;
+        }
+      }
+      // Blanket delete for legacy drafts without a token
+      if (hasUntokenized) {
+        const result = await deleteDraft(profile.id, companyId);
+        if (!result.success) allSuccess = false;
+      }
+      if (allSuccess) {
         setCreateDrafts([]);
         toast.success('Drafts reset successfully');
       } else {
-        toast.error('Failed to reset drafts');
+        toast.error('Failed to reset some drafts');
       }
     }
   };
