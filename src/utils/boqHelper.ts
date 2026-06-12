@@ -1,25 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
 
-export interface BOQData {
-  id: string;
-  number: string;
-  boq_date: string;
-  client_name: string;
-  client_email?: string;
-  client_phone?: string;
-  client_address?: string;
-  client_city?: string;
-  client_country?: string;
-  contractor?: string;
-  project_title?: string;
-  currency: string;
-  subtotal: number;
-  tax_amount: number;
-  total_amount: number;
-  data?: any;
-  company_id: string;
-  created_by?: string;
-}
+export type BOQData = Database['public']['Tables']['boqs']['Row'];
 
 export async function fetchBOQByNumber(boqNumber: string, companyId: string): Promise<BOQData | null> {
   const { data, error } = await supabase

@@ -68,6 +68,111 @@ export type Database = {
           },
         ]
       }
+      boqs: {
+        Row: {
+          id: string
+          company_id: string | null
+          number: string
+          boq_date: string
+          client_name: string
+          client_email: string | null
+          client_phone: string | null
+          client_address: string | null
+          client_city: string | null
+          client_country: string | null
+          contractor: string | null
+          project_title: string | null
+          currency: string | null
+          subtotal: number | null
+          tax_amount: number | null
+          total_amount: number
+          attachment_url: string | null
+          data: Json | null
+          created_by: string | null
+          created_at: string | null
+          updated_at: string | null
+          status: string | null
+          converted_to_invoice_id: string | null
+          converted_at: string | null
+          due_date: string | null
+          terms_and_conditions: string | null
+          showCalculatedValuesInTerms: boolean | null
+        }
+        Insert: {
+          id?: string
+          company_id?: string | null
+          number: string
+          boq_date: string
+          client_name: string
+          client_email?: string | null
+          client_phone?: string | null
+          client_address?: string | null
+          client_city?: string | null
+          client_country?: string | null
+          contractor?: string | null
+          project_title?: string | null
+          currency?: string | null
+          subtotal?: number | null
+          tax_amount?: number | null
+          total_amount: number
+          attachment_url?: string | null
+          data?: Json | null
+          created_by?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+          status?: string | null
+          converted_to_invoice_id?: string | null
+          converted_at?: string | null
+          due_date?: string | null
+          terms_and_conditions?: string | null
+          showCalculatedValuesInTerms?: boolean | null
+        }
+        Update: {
+          id?: string
+          company_id?: string | null
+          number?: string
+          boq_date?: string
+          client_name?: string
+          client_email?: string | null
+          client_phone?: string | null
+          client_address?: string | null
+          client_city?: string | null
+          client_country?: string | null
+          contractor?: string | null
+          project_title?: string | null
+          currency?: string | null
+          subtotal?: number | null
+          tax_amount?: number | null
+          total_amount?: number
+          attachment_url?: string | null
+          data?: Json | null
+          created_by?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+          status?: string | null
+          converted_to_invoice_id?: string | null
+          converted_at?: string | null
+          due_date?: string | null
+          terms_and_conditions?: string | null
+          showCalculatedValuesInTerms?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "boqs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "boqs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           address: string | null

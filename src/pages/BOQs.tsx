@@ -26,6 +26,9 @@ import { useConvertBoqToInvoice } from '@/hooks/useBOQ';
 import { convertLCLBOQToInvoice } from '@/services/lclBoqService';
 import { listCreateDrafts, deleteDraft } from '@/services/boqAutoSaveService';
 import { generateUniqueInvoiceNumber } from '@/utils/invoiceNumberGenerator';
+import { BOQData } from '@/utils/boqHelper';
+import { BOQDraftRecord } from '@/services/boqAutoSaveService';
+import { BOQ_STATUS, sanitizeBOQStatus } from '@/utils/boqConstants';
 import { toast } from 'sonner';
 import SEO from '@/components/SEO';
 
@@ -34,12 +37,14 @@ export default function BOQs() {
   const [open, setOpen] = useState(false);
   const [percentageCopyOpen, setPercentageCopyOpen] = useState(false);
   const [percentageRateOpen, setPercentageRateOpen] = useState(false);
-  const [percentageRateBoq, setPercentageRateBoq] = useState<any | null>(null);
+  const [percentageRateBoq, setPercentageRateBoq] = useState<BOQData | null>(null);
   const [schemaError, setSchemaError] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [dueDateFromFilter, setDueDateFromFilter] = useState('');
   const [dueDateToFilter, setDueDateToFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'overdue' | 'aging' | 'current'>('all');
+  const [currencyFilter, setCurrencyFilter] = useState<string>('');
+  const [conversionStatusFilter, setConversionStatusFilter] = useState<'all' | 'converted' | 'unconverted'>('all');
   const [linkedBOQIds, setLinkedBOQIds] = useState<Set<string>>(new Set());
 
   // Hooks and context calls first
@@ -54,11 +59,11 @@ export default function BOQs() {
   const convertToInvoice = useConvertBoqToInvoice();
 
   // State declarations
-  const [viewing, setViewing] = useState<any | null>(null);
-  const [editing, setEditing] = useState<any | null>(null);
+  const [viewing, setViewing] = useState<BOQData | null>(null);
+  const [editing, setEditing] = useState<BOQData | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; boqId?: string; boqNumber?: string }>({ open: false });
   const [convertDialog, setConvertDialog] = useState<{ open: boolean; boqId?: string; boqNumber?: string; isLCL?: boolean }>({ open: false });
-  const [createDrafts, setCreateDrafts] = useState<any[]>([]);
+  const [createDrafts, setCreateDrafts] = useState<BOQDraftRecord[]>([]);
   const [continueDraftToken, setContinueDraftToken] = useState<string | null>(null);
 
   // Helper function to refresh linked BOQ IDs (with timeout to prevent blocking)
@@ -76,14 +81,14 @@ export default function BOQs() {
         setTimeout(() => reject(new Error('Linked BOQs fetch timeout')), 5000)
       );
 
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
+      const { data, error } = (await Promise.race([fetchPromise, timeoutPromise])) as { data: Array<{ boq_id: string }> | null; error: Error | null };
 
       if (error) {
         console.warn('⚠️ Failed to fetch linked BOQ IDs (continuing):', error);
         return;
       }
 
-      const ids = new Set(data?.map((record: any) => record.boq_id).filter(Boolean) || []);
+      const ids = new Set(data?.map((record) => record.boq_id).filter(Boolean) || []);
       setLinkedBOQIds(ids);
     } catch (err) {
       console.warn('⚠️ Error fetching linked BOQ IDs (continuing):', err);
@@ -160,7 +165,9 @@ export default function BOQs() {
     const search = searchTerm.toLowerCase();
     const matchesSearch =
       String(boq.number || '').toLowerCase().includes(search) ||
-      String(boq.client_name || '').toLowerCase().includes(search);
+      String(boq.client_name || '').toLowerCase().includes(search) ||
+      String(boq.contractor || '').toLowerCase().includes(search) ||
+      String(boq.project_title || '').toLowerCase().includes(search);
 
     // Due date filter
     const dueDate = boq.due_date ? new Date(boq.due_date) : null;
@@ -171,7 +178,17 @@ export default function BOQs() {
     const boqStatus = categorizeBOQ(boq);
     const matchesStatus = statusFilter === 'all' || boqStatus === statusFilter;
 
-    return matchesSearch && matchesDueDateFrom && matchesDueDateTo && matchesStatus;
+    // Currency filter
+    const matchesCurrency = !currencyFilter || (boq.currency || 'KES') === currencyFilter;
+
+    // Conversion status filter
+    const isConverted = !!boq.converted_to_invoice_id;
+    const matchesConversionStatus =
+      conversionStatusFilter === 'all' ||
+      (conversionStatusFilter === 'converted' && isConverted) ||
+      (conversionStatusFilter === 'unconverted' && !isConverted);
+
+    return matchesSearch && matchesDueDateFrom && matchesDueDateTo && matchesStatus && matchesCurrency && matchesConversionStatus;
   });
 
   const handleClearFilters = () => {
@@ -179,6 +196,8 @@ export default function BOQs() {
     setDueDateFromFilter('');
     setDueDateToFilter('');
     setStatusFilter('all');
+    setCurrencyFilter('');
+    setConversionStatusFilter('all');
     toast.success('Filters cleared');
   };
 
@@ -306,15 +325,15 @@ export default function BOQs() {
       const boqData = boqToUse.data ? { ...boqToUse.data } : {};
 
       // Use ONLY top-level columns for terms (single source of truth)
-      const termsToUse = boqToUse.termsAndConditions || '';
+      const termsToUse = boqToUse.terms_and_conditions || '';
       const showCalculatedValues = boqToUse.showCalculatedValuesInTerms || false;
 
       // Log term retrieval for diagnostics
       console.log('BOQ Terms Retrieval Diagnostic:', {
         boqNumber: boqToUse.number,
         fetchWasSuccessful,
-        hasTopLevelTerms: !!boqToUse.termsAndConditions,
-        topLevelTermsLength: boqToUse.termsAndConditions?.length || 0,
+        hasTopLevelTerms: !!boqToUse.terms_and_conditions,
+        topLevelTermsLength: boqToUse.terms_and_conditions?.length || 0,
         finalTermsLength: termsToUse.length,
         topLevelShowCalcValues: boqToUse.showCalculatedValuesInTerms,
         finalShowCalcValues: showCalculatedValues,
@@ -333,7 +352,7 @@ export default function BOQs() {
           city: boqToUse.client_city || undefined,
           country: boqToUse.client_country || undefined,
         },
-        termsAndConditions: termsToUse,
+        terms_and_conditions: termsToUse,
         showCalculatedValuesInTerms: showCalculatedValues,
         contractor: boqToUse.data?.contractor,
         project_title: boqToUse.project_title || boqToUse.data?.project_title,
@@ -713,6 +732,36 @@ export default function BOQs() {
                     </div>
                   </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="currency-filter" className="text-xs sm:text-sm">Currency</Label>
+                    <select
+                      id="currency-filter"
+                      value={currencyFilter}
+                      onChange={(e) => setCurrencyFilter(e.target.value)}
+                      className="w-full px-2 py-1 text-xs sm:text-sm border rounded"
+                    >
+                      <option value="">All</option>
+                      <option value="KES">KES</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="conversion-status" className="text-xs sm:text-sm">Conversion Status</Label>
+                    <select
+                      id="conversion-status"
+                      value={conversionStatusFilter}
+                      onChange={(e) => setConversionStatusFilter(e.target.value as 'all' | 'converted' | 'unconverted')}
+                      className="w-full px-2 py-1 text-xs sm:text-sm border rounded"
+                    >
+                      <option value="all">All</option>
+                      <option value="converted">Converted to Invoice</option>
+                      <option value="unconverted">Not Converted</option>
+                    </select>
+                  </div>
+
                   <Button
                     variant="outline"
                     onClick={handleClearFilters}
@@ -824,9 +873,11 @@ export default function BOQs() {
                       <TableHead className="text-xs md:text-sm">Due Date</TableHead>
                       <TableHead className="hidden sm:table-cell text-xs md:text-sm">Client</TableHead>
                       <TableHead className="hidden lg:table-cell text-xs md:text-sm">Project</TableHead>
+                      <TableHead className="hidden md:table-cell text-xs md:text-sm">Contractor</TableHead>
                       <TableHead className="text-xs md:text-sm">Currency</TableHead>
                       <TableHead className="text-xs md:text-sm">Status</TableHead>
                       <TableHead className="text-right text-xs md:text-sm">Total</TableHead>
+                      <TableHead className="hidden lg:table-cell text-xs md:text-sm">Created By</TableHead>
                       <TableHead className="text-xs md:text-sm">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -838,12 +889,25 @@ export default function BOQs() {
                         <TableCell className="text-xs md:text-sm">{b.due_date ? new Date(b.due_date).toLocaleDateString() : '-'}</TableCell>
                         <TableCell className="hidden sm:table-cell text-xs md:text-sm">{b.client_name}</TableCell>
                         <TableCell className="hidden lg:table-cell text-xs md:text-sm">{b.project_title || '-'}</TableCell>
+                        <TableCell className="hidden md:table-cell text-xs md:text-sm">{b.contractor || '-'}</TableCell>
                         <TableCell className="text-xs md:text-sm"><Badge variant="outline" className="text-xs">{b.currency || 'KES'}</Badge></TableCell>
                         <TableCell className="text-xs md:text-sm">
                           <div className="flex flex-col gap-1">
-                            <Badge variant={b.status === 'converted' ? 'default' : b.status === 'cancelled' ? 'destructive' : 'secondary'} className="text-xs w-fit">
-                              {b.status === 'draft' ? 'Draft' : b.status === 'converted' ? 'Converted' : 'Cancelled'}
-                            </Badge>
+                            {(() => {
+                              const validStatus = sanitizeBOQStatus(b.status);
+                              const statusLabel = validStatus === BOQ_STATUS.DRAFT ? 'Draft' : validStatus === BOQ_STATUS.CONVERTED ? 'Converted' : 'Cancelled';
+                              const badgeVariant = validStatus === BOQ_STATUS.CONVERTED ? 'default' : validStatus === BOQ_STATUS.CANCELLED ? 'destructive' : 'secondary';
+                              return (
+                                <Badge variant={badgeVariant} className="text-xs w-fit">
+                                  {statusLabel}
+                                </Badge>
+                              );
+                            })()}
+                            {b.converted_to_invoice_id && (
+                              <Badge variant="outline" className="text-xs w-fit">
+                                Invoice #...
+                              </Badge>
+                            )}
                             {linkedBOQIds.has(b.id) && (
                               <Badge variant="outline" className="text-xs w-fit flex items-center gap-1">
                                 <Lock className="h-3 w-3" />
@@ -853,6 +917,7 @@ export default function BOQs() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right text-xs md:text-sm">{new Intl.NumberFormat('en-KE', { style: 'currency', currency: b.currency || 'KES' }).format(Number(b.total_amount || b.subtotal || 0))}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-xs md:text-sm">{b.created_by ? '✓' : '-'}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 md:gap-2 flex-wrap">
                             <Button
