@@ -96,7 +96,7 @@ export type Database = {
           converted_at: string | null
           due_date: string | null
           terms_and_conditions: string | null
-          show_calculated_values_in_terms: boolean | null
+          showCalculatedValuesInTerms: boolean | null
         }
         Insert: {
           id?: string
@@ -125,7 +125,7 @@ export type Database = {
           converted_at?: string | null
           due_date?: string | null
           terms_and_conditions?: string | null
-          show_calculated_values_in_terms?: boolean | null
+          showCalculatedValuesInTerms?: boolean | null
         }
         Update: {
           id?: string
@@ -154,7 +154,7 @@ export type Database = {
           converted_at?: string | null
           due_date?: string | null
           terms_and_conditions?: string | null
-          show_calculated_values_in_terms?: boolean | null
+          showCalculatedValuesInTerms?: boolean | null
         }
         Relationships: [
           {
