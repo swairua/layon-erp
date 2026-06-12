@@ -51,6 +51,7 @@ const OptimizedCustomers = lazy(() => import("./pages/OptimizedCustomers"));
 const CustomerPerformanceOptimizerPage = lazy(() => import("./pages/CustomerPerformanceOptimizerPage"));
 const AuditLogs = lazy(() => import("./pages/AuditLogs"));
 const DatabaseFix = lazy(() => import("./pages/DatabaseFix"));
+const CompanyIdConsolidation = lazy(() => import("./pages/CompanyIdConsolidation"));
 
 // Error boundary class component to catch module loading errors
 class AppErrorBoundary extends Component<
@@ -657,6 +658,9 @@ const App = () => {
 
           {/* Database Fix - No protection needed (for troubleshooting) */}
           <Route path="/database-fix" element={<DatabaseFix />} />
+
+          {/* Company ID Consolidation Tool */}
+          <Route path="/company-id-consolidation" element={<CompanyIdConsolidation />} />
 
           {/* Audit Logs */}
           <Route
