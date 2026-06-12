@@ -207,7 +207,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
           })),
           notes: changes.notes,
         },
-        terms_and_conditions: changes.termsAndConditions || null,
+        termsAndConditions: changes.termsAndConditions || null,
         showCalculatedValuesInTerms: changes.showCalculatedValuesInTerms,
       };
 
@@ -320,9 +320,9 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
           setContractor(dataToUse.contractor || boqData.contractor || '');
           setNotes(boqData.notes || '');
 
-          const termsToUse = dataToUse.terms_and_conditions || '';
+          const termsToUse = dataToUse.termsAndConditions || '';
           setTermsAndConditions(termsToUse);
-          const showCalcValues = dataToUse.show_calculated_values_in_terms || false;
+          const showCalcValues = dataToUse.showCalculatedValuesInTerms || false;
           setShowCalculatedValuesInTerms(showCalcValues);
 
           const currencyToUse = dataToUse.currency || boqData.currency || 'KES';
@@ -610,8 +610,8 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
         tax_amount: 0,
         total_amount: filledSubtotal,
         data: doc,
-        terms_and_conditions: termsAndConditions || null,
-        show_calculated_values_in_terms: showCalculatedValuesInTerms,
+        termsAndConditions: termsAndConditions || null,
+        showCalculatedValuesInTerms: showCalculatedValuesInTerms,
       };
 
       const { error: updateError } = await supabase.from('boqs').update(payload).eq('id', boq.id);

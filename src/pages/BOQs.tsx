@@ -306,17 +306,17 @@ export default function BOQs() {
       const boqData = boqToUse.data ? { ...boqToUse.data } : {};
 
       // Use ONLY top-level columns for terms (single source of truth)
-      const termsToUse = boqToUse.terms_and_conditions || '';
-      const showCalculatedValues = boqToUse.show_calculated_values_in_terms || false;
+      const termsToUse = boqToUse.termsAndConditions || '';
+      const showCalculatedValues = boqToUse.showCalculatedValuesInTerms || false;
 
       // Log term retrieval for diagnostics
       console.log('BOQ Terms Retrieval Diagnostic:', {
         boqNumber: boqToUse.number,
         fetchWasSuccessful,
-        hasTopLevelTerms: !!boqToUse.terms_and_conditions,
-        topLevelTermsLength: boqToUse.terms_and_conditions?.length || 0,
+        hasTopLevelTerms: !!boqToUse.termsAndConditions,
+        topLevelTermsLength: boqToUse.termsAndConditions?.length || 0,
         finalTermsLength: termsToUse.length,
-        topLevelShowCalcValues: boqToUse.show_calculated_values_in_terms,
+        topLevelShowCalcValues: boqToUse.showCalculatedValuesInTerms,
         finalShowCalcValues: showCalculatedValues,
       });
 
@@ -333,7 +333,7 @@ export default function BOQs() {
           city: boqToUse.client_city || undefined,
           country: boqToUse.client_country || undefined,
         },
-        terms_and_conditions: termsToUse,
+        termsAndConditions: termsToUse,
         showCalculatedValuesInTerms: showCalculatedValues,
         contractor: boqToUse.data?.contractor,
         project_title: boqToUse.project_title || boqToUse.data?.project_title,

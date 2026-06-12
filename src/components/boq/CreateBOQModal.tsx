@@ -612,8 +612,8 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
         total_amount: filledSubtotal,
         attachment_url: null,
         data: { ...insertedDoc, number: currentNumber },
-        terms_and_conditions: termsAndConditions || null,
-        show_calculated_values_in_terms: showCalculatedValuesInTerms,
+        termsAndConditions: termsAndConditions || null,
+        showCalculatedValuesInTerms: showCalculatedValuesInTerms,
         created_by: profile?.id || null,
       };
 
