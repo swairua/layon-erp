@@ -555,9 +555,10 @@ export const useBOQs = (companyId?: string, selectFields?: string) => {
     enabled: !!companyId,
     queryFn: async () => {
       if (!companyId) return [];
+      const fields = selectFields || 'id, number, boq_date, due_date, client_name, project_title, currency, status, total_amount, subtotal, terms_and_conditions, show_calculated_values_in_terms, client_email, client_phone, client_address, client_city, client_country, contractor, converted_to_invoice_id, created_at, updated_at';
       const { data, error } = await supabase
         .from('boqs')
-        .select(selectFields || '*')
+        .select(fields)
         .eq('company_id', companyId)
         .order('created_at', { ascending: false });
       if (error) throw error;

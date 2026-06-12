@@ -832,7 +832,7 @@ export default function BOQs() {
         refetchBOQs();
         refreshLinkedBOQIds();
         refreshCreateDrafts();
-      }} />
+      }} company={currentCompany} />
 
 
       <CreatePercentageCopyModal
@@ -1012,6 +1012,7 @@ export default function BOQs() {
             refetchBOQs();
             refreshLinkedBOQIds();
           }}
+          company={currentCompany}
         />
       )}
 

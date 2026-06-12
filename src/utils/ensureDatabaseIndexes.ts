@@ -18,26 +18,21 @@ export async function ensureDatabaseIndexes(): Promise<{ success: boolean; messa
     const indexCreationSQL = `
       -- BOQs table indexes
       CREATE INDEX IF NOT EXISTS idx_boqs_company_id_created_at 
-        ON boqs(company_id, created_at DESC)
-        WHERE deleted_at IS NULL;
+        ON boqs(company_id, created_at DESC);
 
       CREATE INDEX IF NOT EXISTS idx_boqs_company_id_number 
-        ON boqs(company_id, number)
-        WHERE deleted_at IS NULL;
+        ON boqs(company_id, number);
 
       -- LCL BOQs table indexes
       CREATE INDEX IF NOT EXISTS idx_lcl_boqs_company_id_created_at 
-        ON lcl_boqs(company_id, created_at DESC)
-        WHERE deleted_at IS NULL;
+        ON lcl_boqs(company_id, created_at DESC);
 
       CREATE INDEX IF NOT EXISTS idx_lcl_boqs_company_id_number 
-        ON lcl_boqs(company_id, number)
-        WHERE deleted_at IS NULL;
+        ON lcl_boqs(company_id, number);
 
       -- LCL Template Items hierarchy indexes (if table exists)
       CREATE INDEX IF NOT EXISTS idx_lcl_template_items_structure_section_item
-        ON lcl_template_items(structure_id, section_id, item_number)
-        WHERE deleted_at IS NULL;
+        ON lcl_template_items(structure_id, section_id, item_number);
     `;
 
     // Execute the index creation via RPC or raw query
@@ -73,34 +68,27 @@ export const BOQ_INDEXES_SQL = `
 
 -- BOQs table indexes - for efficient company-based BOQ lookup and sorting
 CREATE INDEX IF NOT EXISTS idx_boqs_company_id_created_at 
-  ON boqs(company_id, created_at DESC)
-  WHERE deleted_at IS NULL;
+  ON boqs(company_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_boqs_company_id_number 
-  ON boqs(company_id, number)
-  WHERE deleted_at IS NULL;
+  ON boqs(company_id, number);
 
 -- LCL BOQs table indexes - same as BOQs for consistency
 CREATE INDEX IF NOT EXISTS idx_lcl_boqs_company_id_created_at 
-  ON lcl_boqs(company_id, created_at DESC)
-  WHERE deleted_at IS NULL;
+  ON lcl_boqs(company_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_lcl_boqs_company_id_number 
-  ON lcl_boqs(company_id, number)
-  WHERE deleted_at IS NULL;
+  ON lcl_boqs(company_id, number);
 
 -- LCL Template Items hierarchy index - for efficient structure navigation
 CREATE INDEX IF NOT EXISTS idx_lcl_template_items_structure_section_item
-  ON lcl_template_items(structure_id, section_id, item_number)
-  WHERE deleted_at IS NULL;
+  ON lcl_template_items(structure_id, section_id, item_number);
 
 -- Composite index for customer lookup by company
 CREATE INDEX IF NOT EXISTS idx_customers_company_id_created_at
-  ON customers(company_id, created_at DESC)
-  WHERE deleted_at IS NULL;
+  ON customers(company_id, created_at DESC);
 
 -- Units index for quick lookup
 CREATE INDEX IF NOT EXISTS idx_units_company_id_created_at
-  ON units(company_id, created_at DESC)
-  WHERE deleted_at IS NULL;
+  ON units(company_id, created_at DESC);
 `;

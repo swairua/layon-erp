@@ -24,7 +24,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Trash2, Calculator, Layers, Check } from 'lucide-react';
-import { useCompanies, useCustomers, useUnits, useBOQs } from '@/hooks/useDatabase';
+import { useCustomers, useUnits, useBOQs } from '@/hooks/useDatabase';
 import { CreateUnitModal } from '@/components/units/CreateUnitModal';
 import { BOQSaveIndicator } from '@/components/boq/BOQSaveIndicator';
 import { toast } from 'sonner';
@@ -47,6 +47,7 @@ interface CreateBOQModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  company: any;
 }
 
 
@@ -95,9 +96,8 @@ const defaultSection = (): BOQSectionRow => ({
   ],
 });
 
-export function CreateBOQModal({ open, onOpenChange, onSuccess }: CreateBOQModalProps) {
-  const { data: companies } = useCompanies();
-  const currentCompany = companies?.[0];
+export function CreateBOQModal({ open, onOpenChange, onSuccess, company }: CreateBOQModalProps) {
+  const currentCompany = company;
   const { data: customers = [] } = useCustomers(currentCompany?.id);
   const { data: units = [] } = useUnits(currentCompany?.id);
   const { data: existingBOQs = [] } = useBOQs(currentCompany?.id, 'id, number');

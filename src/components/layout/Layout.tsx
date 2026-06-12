@@ -1,8 +1,11 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCurrentCompany } from '@/contexts/CompanyContext';
 import { EnhancedLogin } from '@/components/auth/EnhancedLogin';
 
 interface LayoutProps {
@@ -23,6 +26,33 @@ export function Layout({ children }: LayoutProps) {
   useEffect(() => {
     console.log(`📍 [Layout] Auth state changed - isAuthenticated: ${isAuthenticated}, loading: ${loading}, route: ${location.pathname}`);
   }, [isAuthenticated, loading, location.pathname]);
+
+  // Prefetch data for child pages once company is known
+  const queryClient = useQueryClient();
+  const { currentCompany } = useCurrentCompany();
+
+  useEffect(() => {
+    const cId = currentCompany?.id;
+    if (!cId || !isAuthenticated) return;
+
+    queryClient.prefetchQuery({
+      queryKey: ['units', cId],
+      queryFn: async () => {
+        const { data } = await supabase.from('units').select('*').eq('company_id', cId).order('name', { ascending: true });
+        return data || [];
+      },
+      staleTime: 5 * 60_000,
+    });
+
+    queryClient.prefetchQuery({
+      queryKey: ['customers', cId],
+      queryFn: async () => {
+        const { data } = await supabase.from('customers').select('*').eq('company_id', cId).order('created_at', { ascending: false });
+        return data || [];
+      },
+      staleTime: 5 * 60_000,
+    });
+  }, [currentCompany?.id, isAuthenticated, queryClient]);
 
   // Show login when auth init is complete and user is not authenticated
   if (!loading && !isAuthenticated && !isPublicRoute) {
