@@ -60,22 +60,13 @@ const sidebarItems: SidebarItem[] = [
   {
     title: 'BOQs',
     icon: FileSpreadsheet,
-    href: '/boqs'
-  },
-  {
-    title: 'Fixed BOQ',
-    icon: FileSpreadsheet,
-    href: '/fixed-boq'
-  },
-  {
-    title: 'LCL Template',
-    icon: FileSpreadsheet,
-    href: '/lcl-template'
-  },
-  {
-    title: 'LCL BOQ List',
-    icon: FileSpreadsheet,
-    href: '/lcl-boq-list'
+    children: [
+      { title: 'Standard BOQs', icon: FileSpreadsheet, href: '/boqs' },
+      { title: 'Fixed BOQ', icon: FileSpreadsheet, href: '/fixed-boq' },
+      { title: 'Hierarchical BOQ', icon: FileSpreadsheet, href: '/boq/hierarchical' },
+      { title: 'LCL Template', icon: FileSpreadsheet, href: '/lcl-template' },
+      { title: 'LCL BOQ List', icon: FileSpreadsheet, href: '/lcl-boq-list' }
+    ]
   },
   {
     title: 'Payments',

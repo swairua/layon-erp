@@ -1,67 +1,88 @@
-# Hierarchical Fixed BOQ Implementation
+# Hierarchical BOQ Implementation
 
 ## Overview
+The Hierarchical BOQ workflow manages Bills of Quantities with multi-level nesting: Sections → Subsections → Items. Supports complex project structures with cost breakdowns at each level.
 
-This document describes the hierarchical Fixed BOQ system implementation, which extends the flat `fixed_boq_items` table to support nested sections > subsections > items structures, matching professional BOQ formats like BOQ-085.
+## Database Schema
 
-## Architecture
+### Core Tables
 
-### Database Schema
+#### `boq_fixed_structures`
 
-#### New Tables
+Defines the hierarchical template structure (sections and subsections layout).
 
-1. **`boq_fixed_structures`** - Defines hierarchical BOQ templates
-   - `id` (UUID PK)
-   - `company_id` (FK to companies)
-   - `name` (VARCHAR) - Template name (e.g., "BOQ-085 Residential Maisonette")
-   - `description` (TEXT)
-   - `structure_data` (JSONB) - Nested section/subsection definitions
-   - `is_active` (BOOLEAN)
-   - `created_at`, `updated_at`
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID | Primary key |
+| `company_id` | UUID | Company scope |
+| `name` | VARCHAR | Structure name (e.g., "Standard Building") |
+| `description` | TEXT | Structure description |
+| `structure_data` | JSONB | Hierarchical section/subsection definitions |
+| `is_active` | BOOLEAN | Active/archived flag |
+| `created_at` | TIMESTAMPTZ | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | Last update timestamp |
 
-2. **`boq_fixed_items_v2`** - Hierarchical items with section/subsection mapping
-   - `id` (UUID PK)
-   - `company_id` (FK)
-   - `structure_id` (FK to boq_fixed_structures)
-   - `section_id` (TEXT) - e.g., "SECTION_A"
-   - `subsection_id` (TEXT) - e.g., "MATERIALS"
-   - `item_number` (VARCHAR) - Manual or auto-generated (e.g., "1", "2", "A", "B")
-   - `description` (TEXT)
-   - `unit` (TEXT)
-   - `default_qty` (NUMERIC)
-   - `default_rate` (NUMERIC)
-   - `sort_order` (INTEGER)
-   - `created_at`, `updated_at`
+#### `boq_fixed_items_v2`
 
-3. **`boq_fixed_items_migration_log`** - Tracks migration from legacy schema
-   - For auditing and recovery purposes
+Individual line items within the hierarchical structure.
 
-#### Structure Data Format (JSONB)
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID | Primary key |
+| `structure_id` | UUID | FK to boq_fixed_structures |
+| `section_id` | VARCHAR | Section identifier (e.g., "SECTION_A") |
+| `subsection_id` | VARCHAR | Subsection identifier (e.g., "MATERIALS") |
+| `description` | VARCHAR | Item description |
+| `unit` | VARCHAR | Unit of measure (m2, m3, kg, etc.) |
+| `quantity` | NUMERIC | Item quantity |
+| `unit_price` | NUMERIC | Price per unit |
+| `total` | NUMERIC | Calculated: quantity × unit_price |
+| `notes` | TEXT | Item-specific notes |
+| `sequence` | INT | Display order within subsection |
+| `created_at` | TIMESTAMPTZ | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | Last update timestamp |
+
+#### `boq_fixed_items_migration_log` (optional)
+
+Tracks migrations/versions of hierarchical data for audit purposes.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID | Primary key |
+| `structure_id` | UUID | Structure being migrated |
+| `from_version` | INT | Source version |
+| `to_version` | INT | Target version |
+| `changes` | JSONB | Migration details |
+| `migrated_at` | TIMESTAMPTZ | Migration timestamp |
+
+## JSONB Structure: `structure_data`
+
+Defines the hierarchical layout without item content:
 
 ```json
 {
   "sections": [
     {
       "id": "SECTION_A",
-      "name": "FOUNDATION",
+      "name": "FOUNDATION WORKS",
       "subsections": [
         {
           "id": "MATERIALS",
-          "name": "Subsection A: Materials"
+          "name": "Materials & Supplies"
         },
         {
           "id": "LABOR",
-          "name": "Subsection B: Labor"
+          "name": "Labour Costs"
         }
       ]
     },
     {
       "id": "SECTION_B",
-      "name": "GROUND FLOOR WALLING",
+      "name": "STRUCTURAL WORKS",
       "subsections": [
         {
-          "id": "MATERIALS",
-          "name": "Subsection A: Materials"
+          "id": "CONCRETE",
+          "name": "Concrete Work"
         }
       ]
     }
@@ -69,301 +90,181 @@ This document describes the hierarchical Fixed BOQ system implementation, which 
 }
 ```
 
-## Application Stack
+## Hierarchical Data Structure
 
-### Services
+Returned by `getHierarchicalData()`:
 
-**`src/services/hierarchicalBOQService.ts`**
-- `createStructure()` - Create new structure template
-- `getStructures()` - Fetch all templates for company
-- `getHierarchicalData()` - Build complete hierarchical tree with calculations
-- `insertItems()` - Bulk insert items
-- `updateItem()` - Update single item
-- `deleteItem()` - Delete item
-- `migrateFromLegacy()` - Migrate from old fixed_boq_items table
-- `exportForPDF()` - Export for PDF generation
-
-### Utilities
-
-**`src/utils/boqImportParser.ts`**
-- `parseBOQText()` - Parse BOQ text with section/subsection detection
-- `generateItemNumbers()` - Auto-generate numeric or alpha item numbers
-- `validateBOQData()` - Validate parsed items before insertion
-
-**`src/utils/hierarchicalBOQPdfGenerator.ts`**
-- `generateHierarchicalBOQPDF()` - Generate formatted PDF with hierarchical structure
-- Includes section headers, subsection tables, subtotals, and grand total
-
-### UI Components
-
-**`src/pages/FixedBOQHierarchical.tsx`**
-- Structure selection and switching
-- Import text interface (detects sections/subsections)
-- Hierarchical table with expand/collapse
-- Inline item editing (description, unit, qty, rate)
-- Delete operations with confirmation
-- PDF export
-- Responsive layout
-
-## Key Features
-
-### 1. Hierarchical Organization
-- **Sections**: Top-level groupings (e.g., "FOUNDATION", "WALLING")
-- **Subsections**: Mid-level groupings (e.g., "Materials", "Labor")
-- **Items**: Individual line items with qty, unit, rate
-
-### 2. Collapsible UI
-- Click section header to expand/collapse subsections
-- Saves expanded state in component memory
-- Clean visual hierarchy
-
-### 3. Smart Item Numbering
-- **Auto-increment**: Items numbered 1, 2, 3... within each subsection
-- **Manual override**: Edit `item_number` field directly
-- **Flexible format**: Supports numeric or alphabetic (A, B, C...)
-
-### 4. Automatic Calculations
-- **Amount** = Qty × Rate (per item)
-- **Subsection Subtotal** = SUM(Amount)
-- **Section Total** = SUM(Subsection Subtotals)
-- **Grand Total** = SUM(Section Totals)
-
-All calculations update in real-time as you edit quantities and rates.
-
-### 5. Text-based Import
-The import parser detects:
-- **Section headers**: Lines matching pattern `SECTION [A-Z]:` or `SECTION NO.`
-- **Subsection headers**: Lines matching `Subsection [A-Z]:` pattern
-- **Item rows**: Parsed from table format (no/description/qty/unit/rate/amount)
-
-Example input:
-```
-SECTION A: FOUNDATION
-
-Subsection A: Materials
-1 Ballast 7 Trucks 30,000.00 210,000.00
-2 Sand 8 Trucks 30,000.00 240,000.00
-
-Subsection B: Labor
-1 Setting Out 1 Item 6,000.00 6,000.00
-```
-
-### 6. PDF Export
-Generates professional PDF with:
-- Company header (name, address, contact)
-- Section headers with gray background
-- Subsection tables with items
-- Subsection subtotals
-- Section totals (bold)
-- Grand total (black background with white text)
-- Page numbers and footer
-
-## Migration from Legacy System
-
-If you're moving from the flat `fixed_boq_items` table:
-
-```typescript
-// Migrate all existing items to new structure
-const result = await hierarchicalBOQService.migrateFromLegacy(
-  companyId,
-  legacyItems
-);
-
-// Result:
-// {
-//   structure_id: "uuid",
-//   migrated_count: 150
-// }
-```
-
-The migration:
-1. Creates a default structure: "Migrated Legacy BOQ - [date]"
-2. Creates single section: "Migrated Items"
-3. Creates single subsection: "Items"
-4. Maps all legacy items with preserved data
-5. Logs migration in `boq_fixed_items_migration_log`
-
-Old `fixed_boq_items` table remains intact for fallback/reference.
-
-## File Structure
-
-```
-migrations/
-├── 20250527_hierarchical_boq_schema.sql       # Schema tables & RLS
-└── 20250527_seed_hierarchical_boq_example.sql # Example data (optional)
-
-src/
-├── pages/
-│   ├── FixedBOQ.tsx                          # Legacy flat interface
-│   └── FixedBOQHierarchical.tsx               # New hierarchical interface
-├── services/
-│   └── hierarchicalBOQService.ts              # Core business logic
-├── utils/
-│   ├── boqImportParser.ts                    # Text import parsing
-│   └── hierarchicalBOQPdfGenerator.ts         # PDF generation
-├── types/
-│   └── hierarchicalBOQ.ts                    # TypeScript interfaces
-└── components/
-    └── layout/
-        └── Sidebar.tsx                        # Navigation (updated)
-
-docs/
-└── HIERARCHICAL_BOQ_IMPLEMENTATION.md         # This file
-```
-
-## Usage
-
-### Creating a Structure Programmatically
-
-```typescript
-import { hierarchicalBOQService } from '@/services/hierarchicalBOQService';
-
-const structure = await hierarchicalBOQService.createStructure(
-  companyId,
-  'BOQ-085 Residential Maisonette',
-  'Proposed residential project',
-  {
-    sections: [
-      {
-        id: 'SECTION_A',
-        name: 'FOUNDATION',
-        subsections: [
-          { id: 'MATERIALS', name: 'Subsection A: Materials' },
-          { id: 'LABOR', name: 'Subsection B: Labor' }
-        ]
-      }
-    ]
-  }
-);
-```
-
-### Adding Items
-
-```typescript
-await hierarchicalBOQService.insertItems([
-  {
-    company_id: companyId,
-    structure_id: structureId,
-    section_id: 'SECTION_A',
-    subsection_id: 'MATERIALS',
-    item_number: '1',
-    description: 'Ballast',
-    unit: 'Trucks',
-    default_qty: 7,
-    default_rate: 30000,
-    sort_order: 0
-  }
-  // ... more items
-]);
-```
-
-### Fetching Hierarchical Data
-
-```typescript
-const data = await hierarchicalBOQService.getHierarchicalData(structureId);
-
-// data.sections[0].section_name = "FOUNDATION"
-// data.sections[0].subsections[0].subtotal = 1209150.00
-// data.grand_total = 16123890.00
-```
-
-### Exporting to PDF
-
-```typescript
-import { generateHierarchicalBOQPDF } from '@/utils/hierarchicalBOQPdfGenerator';
-
-await generateHierarchicalBOQPDF(
-  hierarchicalData,
-  {
-    name: 'Company Name',
-    address: '123 Main St',
-    city: 'Nairobi',
-    country: 'Kenya',
-    phone: '+254-123-456789',
-    email: 'info@company.com'
+```json
+{
+  "structure": {
+    "id": "uuid",
+    "name": "Structure Name",
+    "company_id": "uuid"
   },
-  'BOQ-085',
-  new Date().toISOString()
-);
-// Browser downloads PDF: BOQ-085.pdf
+  "sections": [
+    {
+      "section_id": "SECTION_A",
+      "section_name": "FOUNDATION WORKS",
+      "subsections": [
+        {
+          "subsection_id": "MATERIALS",
+          "subsection_name": "Materials & Supplies",
+          "items": [
+            {
+              "id": "item-uuid",
+              "description": "Item description",
+              "unit": "m2",
+              "quantity": 100,
+              "unit_price": 50.00,
+              "total": 5000.00,
+              "notes": "Optional notes"
+            }
+          ],
+          "subtotal": 5000.00
+        }
+      ],
+      "total": 5000.00
+    }
+  ],
+  "grand_total": 5000.00
+}
 ```
 
-## Testing Checklist
+## Calculation Rules
 
-- [ ] Migration runs without errors
-- [ ] New tables are created with correct indexes
-- [ ] Can create structure with multiple sections/subsections
-- [ ] Can import text with section/subsection detection
-- [ ] Item editing updates all calculations correctly
-- [ ] Item deletion removes from database and UI
-- [ ] Section expand/collapse works
-- [ ] PDF export generates valid PDF with correct layout
-- [ ] Grand total calculation is accurate
-- [ ] Multiple companies have isolated data
-- [ ] RLS policies prevent cross-company data leakage
+- **Item Total**: quantity × unit_price
+- **Subsection Subtotal**: SUM(item totals within subsection)
+- **Section Total**: SUM(subsection subtotals within section)
+- **Grand Total**: SUM(section totals)
 
-## Performance Considerations
+Calculations are performed server-side and cached for performance.
 
-1. **Indexes**: Created on `company_id`, `structure_id`, `section_id + subsection_id`
-2. **Pagination**: For structures with 10,000+ items, consider:
-   - Lazy-loading items by section
-   - Server-side pagination
-   - Virtual scrolling in UI
-3. **Calculations**: All totals are computed in-memory (fast for typical BOQ sizes)
-4. **PDF Generation**: May slow down for 100+ pages; consider chunking
+## Service Methods
 
-## Backward Compatibility
+### HierarchicalBOQService
 
-- Legacy `fixed_boq_items` table remains untouched
-- Old Fixed BOQ page (`/fixed-boq`) continues to work
-- New hierarchical page (`/fixed-boq-hierarchical`) is separate
-- Sidebar shows both options under "Fixed BOQ" dropdown
+#### Creating & Managing Structures
 
-## Known Limitations
+```typescript
+// Create a new structure template
+async createStructure(
+  companyId: string,
+  name: string,
+  description: string,
+  structureData: BOQStructureData
+): Promise<BOQFixedStructure>
 
-1. **No nested subsections**: Only 2 levels (section > subsection > items)
-2. **Item numbering**: Auto-increment resets per subsection (not global)
-3. **Manual structure creation**: UI only supports import; structure CRUD via API/code
-4. **PDF styling**: Fixed layout; custom branding limited
-5. **Concurrent edits**: No real-time synchronization (reload required)
+// Fetch all active structures for company
+async getStructures(companyId: string): Promise<BOQFixedStructure[]>
+
+// Get a single structure by ID
+async getStructure(structureId: string): Promise<BOQFixedStructure>
+
+// Update structure metadata/definition
+async updateStructure(
+  structureId: string,
+  updates: Partial<{
+    name: string;
+    description: string;
+    structure_data: BOQStructureData;
+  }>
+): Promise<BOQFixedStructure>
+```
+
+#### Managing Items
+
+```typescript
+// Bulk insert items
+async insertItems(
+  items: Omit<BOQFixedItemV2, 'id' | 'created_at' | 'updated_at'>[]
+): Promise<BOQFixedItemV2[]>
+
+// Get items for a structure
+async getItems(structureId: string): Promise<BOQFixedItemV2[]>
+
+// Update a single item
+async updateItem(
+  itemId: string,
+  updates: Partial<BOQFixedItemV2>
+): Promise<BOQFixedItemV2>
+
+// Delete an item
+async deleteItem(itemId: string): Promise<void>
+```
+
+#### Data Retrieval
+
+```typescript
+// Get complete hierarchical data with calculated totals
+async getHierarchicalData(
+  structureId: string
+): Promise<BOQHierarchicalData>
+```
+
+## Validation Rules
+
+- **Section IDs**: Must be unique within a structure, non-empty string
+- **Subsection IDs**: Must be unique within a section
+- **Item Quantities**: Must be > 0
+- **Unit Prices**: Must be ≥ 0
+- **Descriptions**: Non-empty strings
+- **Structure Depth**: Limited to 2 levels (Sections → Subsections → Items)
+
+## PDF Generation
+
+The `generateHierarchicalBOQPDF()` function:
+- Renders sections with subsection grouping
+- Shows item details with unit prices and totals
+- Displays section subtotals and grand total
+- Includes company logo, dates, and client information
+- Handles page breaks for large BOQs
+
+## UI Components
+
+### FixedBOQHierarchical.tsx
+
+Main page component with:
+- Structure selector dropdown
+- Text/file import dialog
+- Hierarchical item table with expand/collapse
+- Item editor modal
+- Delete confirmation dialog
+- PDF download
+- Drag-and-drop reordering (planned)
+
+## Migration from Standard BOQ
+
+Data migration steps:
+1. Define hierarchical structure (sections/subsections)
+2. Parse standard BOQ items into sections
+3. Insert items into `boq_fixed_items_v2` with section/subsection IDs
+4. Verify calculated totals match original BOQ
+5. Archive original standard BOQ or maintain as reference
 
 ## Future Enhancements
 
-- [ ] UI for creating/editing structure templates
-- [ ] Custom item numbering schemes (A.1, 1.1, etc.)
-- [ ] Real-time collaborative editing
-- [ ] Template library (save/reuse common structures)
-- [ ] Import from Excel/CSV with auto-detection
-- [ ] Section/subsection templates (copy from library)
-- [ ] Budget tracking (target vs. actual cost)
-- [ ] Approval workflows
-- [ ] Export to Excel with formatting
+- **Cost Breakdown**: Additional JSONB fields for material/labour separation per item
+- **Margin Tracking**: Margin percentage and amount at item and section levels
+- **Version Control**: Track structure and item changes with audit trail
+- **Template Reuse**: Save completed BOQs as templates for future projects
+- **Approval Workflow**: Multi-step approval chain with sign-off
+- **Invoice Link**: Direct conversion to invoices with line-item tracking
 
-## Troubleshooting
+## Integration with Other BOQ Types
 
-### Import produces no items
-- Ensure text uses plain (unformatted) format
-- Check section headers match pattern: `SECTION [A-Z]:` or `SECTION NO.`
-- Subsections must start with: `Subsection [A-Z]:`
-- Items must have multiple columns separated by spaces/pipes
+- **Standard BOQ**: Can be imported into Hierarchical structure
+- **LCL BOQ**: Separate workflow, independent implementation
+- **Unified Reporting**: All BOQ types can be queried for dashboards/reports
 
-### PDF not downloading
-- Check browser console for errors
-- Ensure company info is loaded
-- Try smaller BOQ first (100 items)
+## Database Indexes
 
-### Missing calculations
-- Verify `default_qty` and `default_rate` are numbers (not NULL)
-- Reload page to refresh calculations
+```sql
+CREATE INDEX idx_boq_fixed_structures_company_id 
+  ON boq_fixed_structures(company_id);
 
-### Cross-company data visible
-- Check RLS policies in database
-- Verify `company_id` matches current user's company
+CREATE INDEX idx_boq_fixed_items_v2_structure_id 
+  ON boq_fixed_items_v2(structure_id);
 
-## Support
-
-For issues or questions:
-1. Check the types in `src/types/hierarchicalBOQ.ts`
-2. Review the service methods in `src/services/hierarchicalBOQService.ts`
-3. Test manually via `/fixed-boq-hierarchical` page
-4. Check Supabase logs for SQL errors
+CREATE INDEX idx_boq_fixed_items_v2_section_subsection 
+  ON boq_fixed_items_v2(section_id, subsection_id);
+```

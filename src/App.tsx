@@ -39,6 +39,7 @@ const RemittanceAdvice = lazy(() => import("./pages/RemittanceAdvice"));
 const LPOs = lazy(() => import("./pages/LPOs"));
 const BOQs = lazy(() => import("./pages/BOQs"));
 const FixedBOQ = lazy(() => import("./pages/FixedBOQ"));
+const FixedBOQHierarchical = lazy(() => import("./pages/FixedBOQHierarchical"));
 const LCLTemplate = lazy(() => import("./pages/LCLTemplate"));
 const LCLBOQList = lazy(() => import("./pages/LCLBOQList"));
 const CreditNotes = lazy(() => import("./pages/CreditNotes"));
@@ -495,6 +496,16 @@ const App = () => {
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
                 <ProtectedRoute>
                   <FixedBOQ />
+                </ProtectedRoute>
+              </Suspense>
+            }
+          />
+          <Route
+            path="/boq/hierarchical"
+            element={
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <FixedBOQHierarchical />
                 </ProtectedRoute>
               </Suspense>
             }
