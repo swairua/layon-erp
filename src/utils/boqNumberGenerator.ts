@@ -41,7 +41,7 @@ function generateNextBOQNumberSync(existingBOQs: Array<{ number: string }>): str
   let maxNumber = 0;
 
   existingBOQs.forEach((boq) => {
-    const match = boq.number.match(/^BOQ-(\d{1,3})$/);
+    const match = boq.number.match(/^BOQ-(\d+)$/);
     if (match && match[1]) {
       const numericPart = parseInt(match[1], 10);
       if (!isNaN(numericPart) && numericPart > maxNumber) {
@@ -99,7 +99,7 @@ async function generateNextBOQNumberAsync(
   let maxNumber = 0;
 
   const extractNumber = (boqNumber: string): number => {
-    const match = boqNumber.match(/^BOQ-(\d{1,3})$/);
+    const match = boqNumber.match(/^BOQ-(\d+)$/);
     return match ? parseInt(match[1], 10) : 0;
   };
 

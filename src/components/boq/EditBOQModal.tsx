@@ -410,7 +410,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
 
       checkAndLoadDraft();
     }
-  }, [open, boq, customers, profile?.id, currentCompany?.id]);
+  }, [open, boq?.id, profile?.id, currentCompany?.id]);
 
   const addSection = () => {
     setSections(prev => [...prev, defaultSection()]);
@@ -518,13 +518,13 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
   }, [sections, taxAmount]);
 
   const isItemEmpty = (item: BOQItemRow): boolean => {
-    return !item.description.trim() && item.quantity === 1 && item.rate === 0;
+    return !item.description.trim() && (item.quantity === '' || item.quantity === 0) && (item.rate === '' || item.rate === 0);
   };
 
   const isItemPartiallyFilled = (item: BOQItemRow): boolean => {
     const hasDescription = item.description.trim().length > 0;
-    const hasQuantity = item.quantity > 0;
-    const hasRate = item.rate >= 0;
+    const hasQuantity = item.quantity !== '' && Number(item.quantity) > 0;
+    const hasRate = item.rate !== '' && Number(item.rate) > 0;
     const filledFields = [hasDescription, hasQuantity, hasRate].filter(Boolean).length;
     return filledFields > 0 && filledFields < 3;
   };
@@ -628,12 +628,12 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
         total_amount: finalTotal,
         attachment_url: attachmentUrl || null,
         data: doc,
-        termsAndConditions: termsAndConditions || null,
+        terms_and_conditions: termsAndConditions || null,
         showCalculatedValuesInTerms: showCalculatedValuesInTerms,
         status: boqStatus,
       };
 
-      const { error: updateError } = await supabase.from('boqs').update(payload).eq('id', boq.id);
+      const { error: updateError } = await supabase.from('boqs').update(payload).eq('id', boq.id).eq('company_id', currentCompany?.id);
       if (updateError) {
         console.error('Failed to update BOQ:', updateError);
         toast.error('Failed to update BOQ');

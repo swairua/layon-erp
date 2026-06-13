@@ -165,7 +165,7 @@ class LCLBOQService {
       .select('id')
       .eq('company_id', boq.company_id)
       .eq('number', 'DRAFT')
-      .single();
+      .maybeSingle();
 
     // If draft exists, update it; otherwise create new one
     if (existingDraft) {

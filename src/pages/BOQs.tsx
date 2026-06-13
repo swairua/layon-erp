@@ -22,7 +22,6 @@ import { useCurrentCompany } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBOQs, useUnits } from '@/hooks/useDatabase';
 import { useAuditLog } from '@/hooks/useAuditLog';
-import { useAuditedDeleteOperations } from '@/hooks/useAuditedDeleteOperations';
 import { useConvertBoqToInvoice } from '@/hooks/useBOQ';
 import { convertLCLBOQToInvoice } from '@/services/lclBoqService';
 import { listCreateDrafts, deleteDraft } from '@/services/boqAutoSaveService';
@@ -34,6 +33,13 @@ import { toast } from 'sonner';
 import SEO from '@/components/SEO';
 
 type BOQ = Database['public']['Tables']['boqs']['Row'];
+
+const formatCurrencyLocales: Record<string, string> = {
+  KES: 'en-KE',
+  USD: 'en-US',
+  EUR: 'en-GB',
+  GBP: 'en-GB',
+};
 
 export default function BOQs() {
   const [searchParams] = useSearchParams();
@@ -55,8 +61,6 @@ export default function BOQs() {
   const { profile } = useAuth();
   const companyId = currentCompany?.id;
   const { data: boqs = [], isLoading, refetch: refetchBOQs, error: boqsError } = useBOQs(companyId);
-  const { useAuditedDeleteBOQ } = useAuditedDeleteOperations();
-  const deleteBOQ = useAuditedDeleteBOQ(companyId || '');
   const { data: units = [] } = useUnits(companyId);
   const { logDelete } = useAuditLog();
   const convertToInvoice = useConvertBoqToInvoice();
@@ -503,13 +507,9 @@ export default function BOQs() {
       );
 
       setConvertDialog({ open: false });
-      // Refetch to update the BOQ list and show converted status
-      // Wait for mutation's onSuccess to invalidate cache, then refetch
-      setTimeout(() => {
-        console.log('🔄 Refetching BOQs after conversion');
-        refetchBOQs();
-      }, 1000);
+      refetchBOQs();
     } catch (err) {
+      toast.dismiss();
       console.error('BOQ conversion failed:', err);
 
       let errorMessage = 'Unknown error occurred';
@@ -921,9 +921,9 @@ export default function BOQs() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell text-right text-xs md:text-sm">{new Intl.NumberFormat('en-KE', { style: 'currency', currency: b.currency || 'KES' }).format(Number(b.subtotal || 0))}</TableCell>
-                        <TableCell className="hidden lg:table-cell text-right text-xs md:text-sm">{new Intl.NumberFormat('en-KE', { style: 'currency', currency: b.currency || 'KES' }).format(Number(b.tax_amount || 0))}</TableCell>
-                        <TableCell className="text-right text-xs md:text-sm">{new Intl.NumberFormat('en-KE', { style: 'currency', currency: b.currency || 'KES' }).format(Number(b.total_amount || b.subtotal || 0))}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-right text-xs md:text-sm">{new Intl.NumberFormat(formatCurrencyLocales[b.currency] || 'en-KE', { style: 'currency', currency: b.currency || 'KES' }).format(Number(b.subtotal || 0))}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-right text-xs md:text-sm">{new Intl.NumberFormat(formatCurrencyLocales[b.currency] || 'en-KE', { style: 'currency', currency: b.currency || 'KES' }).format(Number(b.tax_amount || 0))}</TableCell>
+                        <TableCell className="text-right text-xs md:text-sm">{new Intl.NumberFormat(formatCurrencyLocales[b.currency] || 'en-KE', { style: 'currency', currency: b.currency || 'KES' }).format(Number(b.total_amount || b.subtotal || 0))}</TableCell>
                         <TableCell className="hidden lg:table-cell text-xs md:text-sm">{b.created_by ? '✓' : '-'}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 md:gap-2 flex-wrap">
@@ -962,7 +962,7 @@ export default function BOQs() {
                               variant="outline"
                               onClick={() => handleConvertClick(b.id, b.number, linkedBOQIds.has(b.id))}
                               title="Convert to Invoice"
-                              disabled={b.converted_to_invoice_id !== null && b.converted_to_invoice_id !== undefined}
+                              disabled={!!b.converted_to_invoice_id}
                               className="h-8 w-8 md:h-9 md:w-9"
                             >
                               <FileText className="h-3 w-3 md:h-4 md:w-4" />

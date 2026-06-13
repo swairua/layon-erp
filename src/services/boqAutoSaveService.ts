@@ -99,7 +99,7 @@ export async function saveBoqDraft(
         sections: formData.sections,
         notes: formData.notes,
       },
-      termsAndConditions: formData.termsAndConditions || null,
+      terms_and_conditions: formData.termsAndConditions || null,
       showCalculatedValuesInTerms: formData.showCalculatedValuesInTerms || false,
       status: formData.boqStatus || 'draft',
       updated_at: new Date().toISOString(),

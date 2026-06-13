@@ -261,10 +261,9 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
 
   const getSectionNameFromTemplate = (sectionId: string): string | undefined => {
     if (!templateStructure || !templateStructure.structure_data?.sections) return undefined;
-    const match = sectionId?.match(/section[_-]?([a-z])/i);
-    if (!match) return undefined;
-    const sectionIndex = match[1].toUpperCase().charCodeAt(0) - 65;
-    const section = templateStructure.structure_data.sections[sectionIndex];
+    const section = templateStructure.structure_data.sections.find(
+      s => s.id?.toLowerCase() === sectionId?.toLowerCase()
+    );
     return section?.name;
   };
 

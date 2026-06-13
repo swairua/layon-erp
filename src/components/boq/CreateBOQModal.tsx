@@ -263,7 +263,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
   }, [profile]);
 
   // Autosave implementation with flush capability
-  const performAutosave = async (formData: any) => {
+  const performAutosave = useCallback(async (formData: any) => {
     if (!currentCompany?.id || !profile?.id) {
       const reason = !currentCompany?.id ? 'Company not loaded yet' : 'Auth not ready yet';
       console.warn('[CreateBOQModal] Autosave deferred: ' + reason, { companyId: currentCompany?.id, profileId: profile?.id });
@@ -314,7 +314,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
     } finally {
       setIsSavingDraft(false);
     }
-  };
+  }, [currentCompany?.id, profile?.id, customers]);
 
   // Create debounced autosave function with manual flush capability (memoized for stability)
   const debouncedAutoSave = useCallback(() => {
@@ -627,7 +627,7 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
         total_amount: finalTotal,
         attachment_url: attachmentUrl || null,
         data: { ...insertedDoc, number: currentNumber },
-        termsAndConditions: termsAndConditions || null,
+        terms_and_conditions: termsAndConditions || null,
         showCalculatedValuesInTerms: showCalculatedValuesInTerms,
         created_by: profile?.id || null,
         status: boqStatus,

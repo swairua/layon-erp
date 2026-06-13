@@ -89,11 +89,9 @@ export function EditLCLBOQModal({
       return undefined;
     }
 
-    const match = sectionId?.match(/section_([a-z])/i);
-    if (!match) return undefined;
-
-    const sectionIndex = match[1].toUpperCase().charCodeAt(0) - 65; // Convert A->0, B->1, etc.
-    const section = templateStructure.structure_data.sections[sectionIndex];
+    const section = templateStructure.structure_data.sections.find(
+      s => s.id?.toLowerCase() === sectionId?.toLowerCase()
+    );
     return section?.name;
   };
 

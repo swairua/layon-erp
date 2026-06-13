@@ -132,7 +132,8 @@ class HierarchicalBOQService {
     const sections: BOQSectionWithSubsections[] = [];
     let grand_total = 0;
 
-    for (const sectionDef of structure.structure_data.sections) {
+    const sectionDefs = structure.structure_data?.sections ?? [];
+    for (const sectionDef of sectionDefs) {
       const subsections: BOQSubsectionWithItems[] = [];
       let section_total = 0;
 
@@ -320,14 +321,14 @@ class HierarchicalBOQService {
       }
     });
 
-    const updatedItems: BOQFixedItemV2[] = [];
-    for (const update of updates) {
-      const updated = await this.updateItem(update.id, {
-        sort_order: update.sort_order,
-        item_number: update.item_number,
-      });
-      updatedItems.push(updated);
-    }
+    const updatedItems = await Promise.all(
+      updates.map(update =>
+        this.updateItem(update.id, {
+          sort_order: update.sort_order,
+          item_number: update.item_number,
+        })
+      )
+    );
 
     return updatedItems;
   }

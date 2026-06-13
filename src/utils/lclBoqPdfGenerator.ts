@@ -1,7 +1,8 @@
 import { generatePDF } from '@/utils/pdfGenerator';
 import { LCLHierarchicalData, LCLItemWithCalculations } from '@/types/lclTemplate';
 
-const safeN = (v: number | undefined) => (typeof v === 'number' && !isNaN(v) ? v : 0);
+const toNumber = (v: number | undefined) => (typeof v === 'number' && !isNaN(v) ? v : undefined);
+const safeN = (v: number | undefined) => toNumber(v) ?? 0;
 
 export interface ItemSnapshot {
   section_id: string;
@@ -80,8 +81,8 @@ function flattenLCLBOQItems(data: LCLHierarchicalData): Array<{
 
       // Add items
       subsection.items.forEach((item: LCLItemWithCalculations) => {
-        const qty = safeN((item as any).qty) || safeN((item as any).default_qty) || 0;
-        const rate = safeN((item as any).rate) || safeN((item as any).default_rate) || 0;
+        const qty = toNumber((item as any).qty) ?? toNumber((item as any).default_qty) ?? 0;
+        const rate = toNumber((item as any).rate) ?? toNumber((item as any).default_rate) ?? 0;
         const amount = safeN(item.amount);
 
         flatItems.push({
@@ -188,7 +189,7 @@ export function reconstructHierarchicalDataFromSnapshot(
       sectionTotal += subtotal;
     });
 
-    const sectionLetter = sectionId.replace(/[^\w]/g, '').match(/[a-zA-Z]/)?.[0]?.toUpperCase() || 'A';
+    const sectionLetter = sectionId.match(/section[_-]?([a-z])/i)?.[1]?.toUpperCase() || 'A';
     sections.push({
       section_id: sectionId,
       // Use preserved section name from snapshot, fallback to constructed name

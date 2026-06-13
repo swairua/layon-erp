@@ -75,7 +75,7 @@ export async function generateHierarchicalBOQPDF(
   addFooter(doc, pageHeight);
 
   // Download
-  doc.save(`BOQ-${boqNumber || 'export'}.pdf`);
+  doc.save(`${boqNumber || 'export'}.pdf`);
 }
 
 /**
@@ -152,6 +152,7 @@ function addSubsectionTable(
 ): number {
   const margin = 10;
   const contentWidth = pageWidth - margin * 2;
+  const pageHeight = doc.internal.pageSize.getHeight();
 
   // Subsection title
   doc.setFontSize(10);
@@ -181,6 +182,11 @@ function addSubsectionTable(
   doc.setFontSize(8);
 
   for (let i = 0; i < items.length; i++) {
+    if (yPos + 6 > pageHeight - margin) {
+      doc.addPage();
+      yPos = margin;
+    }
+
     const item = items[i];
     const qty = item.default_qty || 0;
     const rate = item.default_rate || 0;

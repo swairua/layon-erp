@@ -417,8 +417,11 @@ export class LCLTemplateService {
       };
     });
 
-    // Only update if there are actual changes
-    const hasChanges = sectionIdMap.size > sections.length;
+    // Only update if there are actual changes (section or subsection IDs differ from originals)
+    const hasChanges = sections.some(section => {
+      if (section.id !== sectionIdMap.get(section.id)) return true;
+      return (section.subsections || []).some((sub: any) => sub.id !== sectionIdMap.get(sub.id));
+    });
     if (!hasChanges) {
       return structure;
     }

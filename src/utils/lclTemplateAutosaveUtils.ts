@@ -1,5 +1,3 @@
-import { useLocalStorage } from '@/hooks/useLocalStorage';
-
 interface InlineEdit {
   qty?: number;
   rate?: number;
@@ -10,6 +8,34 @@ interface AutosaveDraft {
   lastSavedAt: string;
 }
 
+const ls = {
+  getItem: <T,>(key: string): T | null => {
+    try {
+      if (typeof window === 'undefined') return null;
+      const item = window.localStorage.getItem(key);
+      return item ? (JSON.parse(item) as T) : null;
+    } catch {
+      return null;
+    }
+  },
+  setItem: <T,>(key: string, value: T): void => {
+    try {
+      if (typeof window === 'undefined') return;
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      // ignore quota errors
+    }
+  },
+  removeItem: (key: string): void => {
+    try {
+      if (typeof window === 'undefined') return;
+      window.localStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+  },
+};
+
 export function getLclTemplateAutosaveKey(structureId: string): string {
   return `lcl_template_draft_${structureId}`;
 }
@@ -18,33 +44,29 @@ export function saveDraftToLocalStorage(
   structureId: string,
   inlineEdits: { [itemId: string]: InlineEdit }
 ): void {
-  const { setItem } = useLocalStorage();
   const key = getLclTemplateAutosaveKey(structureId);
   const draft: AutosaveDraft = {
     inlineEdits,
     lastSavedAt: new Date().toISOString(),
   };
-  setItem(key, draft);
+  ls.setItem(key, draft);
 }
 
 export function loadDraftFromLocalStorage(
   structureId: string
 ): { [itemId: string]: InlineEdit } | null {
-  const { getItem } = useLocalStorage();
   const key = getLclTemplateAutosaveKey(structureId);
-  const draft = getItem<AutosaveDraft>(key);
+  const draft = ls.getItem<AutosaveDraft>(key);
   return draft ? draft.inlineEdits : null;
 }
 
 export function clearDraftFromLocalStorage(structureId: string): void {
-  const { removeItem } = useLocalStorage();
   const key = getLclTemplateAutosaveKey(structureId);
-  removeItem(key);
+  ls.removeItem(key);
 }
 
 export function getDraftLastSavedTime(structureId: string): string | null {
-  const { getItem } = useLocalStorage();
   const key = getLclTemplateAutosaveKey(structureId);
-  const draft = getItem<AutosaveDraft>(key);
+  const draft = ls.getItem<AutosaveDraft>(key);
   return draft ? draft.lastSavedAt : null;
 }

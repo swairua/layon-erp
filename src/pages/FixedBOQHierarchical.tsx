@@ -30,6 +30,7 @@ export default function FixedBOQHierarchical() {
 
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [importText, setImportText] = useState('');
   const [importingFile, setImportingFile] = useState(false);
 
@@ -127,7 +128,6 @@ export default function FixedBOQHierarchical() {
 
       toast.success(`Imported ${parseResult.parsed_items.length} items`);
       setImportText('');
-      setImporting(false);
       await loadHierarchicalData();
     } catch (err) {
       console.error('Import failed:', err);
@@ -150,6 +150,7 @@ export default function FixedBOQHierarchical() {
   };
 
   const handleDeleteItem = async (itemId: string) => {
+    setIsDeleting(true);
     try {
       await hierarchicalBOQService.deleteItem(itemId);
       toast.success('Item deleted');
@@ -158,6 +159,8 @@ export default function FixedBOQHierarchical() {
     } catch (err) {
       console.error('Delete failed:', err);
       toast.error('Failed to delete item');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -206,7 +209,9 @@ export default function FixedBOQHierarchical() {
   const handleDragOver = (e: React.DragEvent, itemId: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    setDragOverItemId(itemId);
+    if (itemId !== draggedItemId) {
+      setDragOverItemId(itemId);
+    }
   };
 
   const handleDragLeave = () => {
@@ -550,12 +555,13 @@ export default function FixedBOQHierarchical() {
         open={deleteDialog.open}
         title="Delete Item"
         message="Are you sure? This cannot be undone."
-        onConfirm={() => {
+        onConfirm={async () => {
           if (deleteDialog.itemId) {
-            handleDeleteItem(deleteDialog.itemId);
+            await handleDeleteItem(deleteDialog.itemId);
           }
         }}
         onCancel={() => setDeleteDialog({ open: false })}
+        isLoading={isDeleting}
       />
     </div>
   );

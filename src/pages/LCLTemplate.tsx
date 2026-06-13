@@ -7,7 +7,7 @@ import { useCurrentCompany } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCustomers } from '@/hooks/useDatabase';
 import { lclTemplateService } from '@/services/lclTemplateService';
-import { LCLHierarchicalData } from '@/types/lclTemplate';
+import { LCLHierarchicalData, LCLTemplateStructure } from '@/types/lclTemplate';
 import { LCLBOQItemEditor, LCLBOQItemEditorHandle, ItemSnapshot } from '@/components/lcl/LCLBOQItemEditor';
 import { lclBoqService, LCLBOQRecord } from '@/services/lclBoqService';
 import { generateNextBOQNumber } from '@/utils/boqNumberGenerator';
@@ -50,6 +50,7 @@ export default function LCLTemplate() {
 
   const [initialItems, setInitialItems] = useState<ItemSnapshot[]>([]);
   const [structureId, setStructureId] = useState<string>('');
+  const [templateStructure, setTemplateStructure] = useState<LCLTemplateStructure | null>(null);
 
   // Prevent accidental unmounting/cleanup
   useEffect(() => {
@@ -67,6 +68,7 @@ export default function LCLTemplate() {
 
     setLoading(true);
     setTemplateError(null);
+    setTemplateStructure(null);
     console.log(`[LCLTemplate] Loading LCL BOQ data for company: ${companyId}`);
     try {
       // Phase 1: Load structures (critical path blocker)
@@ -87,6 +89,8 @@ export default function LCLTemplate() {
         setLoading(false);
         return;
       }
+
+      setTemplateStructure(lclDefaultStructure);
 
       // Phase 2: Load hierarchical data and secondary data (latest BOQ + next number) in parallel
       console.log(`[LCLTemplate] Loading hierarchical data for structure ID: ${lclDefaultStructure.id}`);
@@ -109,10 +113,7 @@ export default function LCLTemplate() {
       } catch (parallelError) {
         console.log('Note: Error loading hierarchical data or generating BOQ number:', parallelError);
         setBoqNumber('BOQ-001');
-        // Continue with empty hierarchical data if that also failed
-        if (!hierarchicalData) {
-          throw parallelError;
-        }
+        throw parallelError;
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to load LCL BOQ template';
@@ -121,7 +122,7 @@ export default function LCLTemplate() {
     } finally {
       setLoading(false);
     }
-  }, [companyId, hierarchicalData]);
+  }, [companyId]);
 
   const handleSaveLCLBOQ = async () => {
     if (!hierarchicalData || !companyId) return;
@@ -534,7 +535,7 @@ export default function LCLTemplate() {
       <LCLBOQItemEditor
         ref={editorRef}
         data={hierarchicalData}
-        templateStructure={undefined}
+        templateStructure={templateStructure}
         companyId={companyId}
         initialItems={initialItems}
         structureId={structureId}

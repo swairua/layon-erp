@@ -109,4 +109,6 @@ export interface UpdateLCLItemRequest {
   default_qty?: number;
   default_rate?: number;
   sort_order?: number;
+  section_id?: string;
+  subsection_id?: string;
 }
