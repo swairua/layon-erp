@@ -17,6 +17,7 @@ import {
   FileText,
   Truck,
   History,
+  BarChart3,
   X,
 } from 'lucide-react';
 import { BiolegendLogo } from '@/components/ui/biolegend-logo';
@@ -73,6 +74,13 @@ const sidebarItems: SidebarItem[] = [
     icon: DollarSign,
     children: [
       { title: 'Payments', icon: DollarSign, href: '/payments' }
+    ]
+  },
+  {
+    title: 'Reports',
+    icon: BarChart3,
+    children: [
+      { title: 'Dashboard', icon: BarChart3, href: '/reports/dashboard' }
     ]
   },
   {

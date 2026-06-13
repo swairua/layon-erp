@@ -57,10 +57,15 @@ function StatCard({ title, value, change, changeType, icon: Icon, alert }: StatC
   );
 }
 
-export function DashboardStats() {
+interface DashboardStatsProps {
+  month?: number;
+  year?: number;
+}
+
+export function DashboardStats({ month, year }: DashboardStatsProps = {}) {
   const { data: companies } = useCompanies();
   const currentCompany = companies?.[0];
-  const { data: stats, isLoading } = useDashboardStats(currentCompany?.id);
+  const { data: stats, isLoading } = useDashboardStats(currentCompany?.id, month, year);
 
   if (isLoading) {
     return (

@@ -2120,9 +2120,9 @@ export const useUpdateDeliveryNote = () => {
 };
 
 // Dashboard stats hook
-export const useDashboardStats = (companyId?: string) => {
+export const useDashboardStats = (companyId?: string, month?: number, year?: number) => {
   return useQuery({
-    queryKey: ['dashboard_stats', companyId],
+    queryKey: ['dashboard_stats', companyId, month, year],
     queryFn: async () => {
       // Get counts and totals
       const [
@@ -2133,7 +2133,7 @@ export const useDashboardStats = (companyId?: string) => {
       ] = await Promise.all([
         supabase
           .from('invoices')
-          .select('total_amount, status')
+          .select('total_amount, status, invoice_date')
           .eq('company_id', companyId || '550e8400-e29b-41d4-a716-446655440000'),
         supabase
           .from('customers')
@@ -2145,14 +2145,24 @@ export const useDashboardStats = (companyId?: string) => {
           .eq('company_id', companyId || '550e8400-e29b-41d4-a716-446655440000'),
         supabase
           .from('cash_receipts')
-          .select('total_amount')
+          .select('total_amount, payment_date')
           .eq('company_id', companyId || '550e8400-e29b-41d4-a716-446655440000')
       ]);
 
-      const totalRevenue = invoices?.reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0) || 0;
-      const totalPayments = cashReceipts?.reduce((sum, receipt) => sum + Number(receipt.total_amount || 0), 0) || 0;
+      // Filter by month/year if provided
+      const filterByMonth = (item: any, dateField: string) => {
+        if (!month || !year) return true;
+        const date = new Date(item[dateField]);
+        return date.getMonth() === month && date.getFullYear() === year;
+      };
+
+      const filteredInvoices = invoices?.filter(inv => filterByMonth(inv, 'invoice_date')) || [];
+      const filteredReceipts = cashReceipts?.filter(receipt => filterByMonth(receipt, 'payment_date')) || [];
+
+      const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0);
+      const totalPayments = filteredReceipts.reduce((sum, receipt) => sum + Number(receipt.total_amount || 0), 0);
       const lowStockProducts = products?.filter(p => p.stock_quantity <= p.minimum_stock_level).length || 0;
-      const pendingInvoices = invoices?.filter(inv => inv.status === 'sent').length || 0;
+      const pendingInvoices = filteredInvoices.filter(inv => inv.status === 'sent').length;
 
       return {
         totalRevenue,
@@ -2161,7 +2171,7 @@ export const useDashboardStats = (companyId?: string) => {
         productCount: products?.length || 0,
         lowStockProducts,
         pendingInvoices,
-        totalInvoices: invoices?.length || 0
+        totalInvoices: filteredInvoices.length
       };
     },
   });

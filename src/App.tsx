@@ -28,6 +28,7 @@ const Inventory = lazy(() => import("./pages/Inventory"));
 const Customers = lazy(() => import("./pages/Customers"));
 const DeliveryNotes = lazy(() => import("./pages/DeliveryNotes"));
 const Proforma = lazy(() => import("./pages/Proforma"));
+const ReportsDashboard = lazy(() => import("./pages/reports/Dashboard"));
 const SalesReports = lazy(() => import("./pages/reports/SalesReports"));
 const InventoryReports = lazy(() => import("./pages/reports/InventoryReports"));
 const StatementOfAccounts = lazy(() => import("./pages/reports/StatementOfAccounts"));
@@ -594,6 +595,16 @@ const App = () => {
           />
 
           {/* Reports */}
+          <Route
+            path="/reports/dashboard"
+            element={
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute>
+                  <ReportsDashboard />
+                </ProtectedRoute>
+              </Suspense>
+            }
+          />
           <Route
             path="/reports/sales"
             element={
