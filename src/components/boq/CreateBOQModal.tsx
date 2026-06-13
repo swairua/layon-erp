@@ -606,6 +606,8 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       // Build payload with current number
+      const finalTaxAmount = typeof taxAmount === 'number' ? taxAmount : 0;
+      const finalTotal = filledSubtotal + finalTaxAmount;
       const payload = {
         company_id: currentCompany.id,
         number: currentNumber,
@@ -621,13 +623,14 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
         project_title: projectTitle || null,
         currency: currency,
         subtotal: filledSubtotal,
-        tax_amount: 0,
-        total_amount: filledSubtotal,
-        attachment_url: null,
+        tax_amount: finalTaxAmount,
+        total_amount: finalTotal,
+        attachment_url: attachmentUrl || null,
         data: { ...insertedDoc, number: currentNumber },
         termsAndConditions: termsAndConditions || null,
         showCalculatedValuesInTerms: showCalculatedValuesInTerms,
         created_by: profile?.id || null,
+        status: boqStatus,
       };
 
       console.log(`[handleGenerate] Attempt ${attempt + 1}: Inserting BOQ with number ${currentNumber}`);
@@ -855,6 +858,29 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>Tax Amount</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={taxAmount}
+                onChange={e => { setTaxAmount(e.target.value === '' ? '' : Number(e.target.value)); markChanged(); }}
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={boqStatus} onValueChange={(val) => { setBoqStatus(val); markChanged(); }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div>
@@ -879,6 +905,14 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
             <div>
               <Label>Contractor</Label>
               <Input value={contractor} onChange={e => { setContractor(e.target.value); markChanged(); }} />
+            </div>
+            <div>
+              <Label>Attachment URL</Label>
+              <Input
+                value={attachmentUrl}
+                onChange={e => { setAttachmentUrl(e.target.value); markChanged(); }}
+                placeholder="https://example.com/attachment.pdf"
+              />
             </div>
           </div>
 
@@ -1028,7 +1062,11 @@ export function CreateBOQModal({ open, onOpenChange, onSuccess, company, initial
               ))}
 
               <div className="flex items-center justify-end gap-6 pt-4">
-                <div className="text-lg font-semibold">Subtotal: {formatCurrency(totals.subtotal)}</div>
+                <div className="space-y-2">
+                  <div className="text-lg font-semibold">Subtotal: {formatCurrency(totals.subtotal)}</div>
+                  <div className="text-lg font-semibold">Tax: {formatCurrency(totals.tax)}</div>
+                  <div className="text-xl font-bold border-t pt-2">Total: {formatCurrency(totals.total)}</div>
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -41,9 +41,9 @@ export function createPercentageCopy(originalBOQ: BOQData, percentage: number, n
     }));
   }
 
-  const newSubtotal = Math.round(originalBOQ.subtotal * multiplier * 100) / 100;
-  const newTaxAmount = Math.round(originalBOQ.tax_amount * multiplier * 100) / 100;
-  const newTotalAmount = Math.round(originalBOQ.total_amount * multiplier * 100) / 100;
+  const newSubtotal = Math.round((originalBOQ.subtotal || 0) * multiplier * 100) / 100;
+  const newTaxAmount = Math.round((originalBOQ.tax_amount || 0) * multiplier * 100) / 100;
+  const newTotalAmount = Math.round((originalBOQ.total_amount || 0) * multiplier * 100) / 100;
 
   return {
     ...originalBOQ,
@@ -51,6 +51,8 @@ export function createPercentageCopy(originalBOQ: BOQData, percentage: number, n
     subtotal: newSubtotal,
     tax_amount: newTaxAmount,
     total_amount: newTotalAmount,
+    attachment_url: originalBOQ.attachment_url,
+    status: 'draft',
     data: newData,
   };
 }

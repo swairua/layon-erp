@@ -21,6 +21,8 @@ export interface BOQDraftData {
   subtotal?: number;
   taxAmount?: number;
   totalAmount?: number;
+  attachmentUrl?: string;
+  boqStatus?: string;
 }
 
 export interface BOQDraftRecord {
@@ -92,12 +94,14 @@ export async function saveBoqDraft(
       subtotal: formData.subtotal || 0,
       tax_amount: formData.taxAmount || 0,
       total_amount: formData.totalAmount || 0,
+      attachment_url: formData.attachmentUrl || null,
       data: {
         sections: formData.sections,
         notes: formData.notes,
       },
       termsAndConditions: formData.termsAndConditions || null,
       showCalculatedValuesInTerms: formData.showCalculatedValuesInTerms || false,
+      status: formData.boqStatus || 'draft',
       updated_at: new Date().toISOString(),
       last_autosaved_at: new Date().toISOString(),
     };
@@ -429,9 +433,11 @@ export async function saveEditingDraft(
       subtotal: boqData.subtotal || 0,
       tax_amount: boqData.tax_amount || 0,
       total_amount: boqData.total_amount || 0,
+      attachment_url: boqData.attachment_url || null,
       data: boqData.data,
       termsAndConditions: boqData.termsAndConditions || null,
       showCalculatedValuesInTerms: boqData.showCalculatedValuesInTerms || false,
+      status: boqData.status || 'draft',
       updated_at: new Date().toISOString(),
       last_autosaved_at: new Date().toISOString(),
     };

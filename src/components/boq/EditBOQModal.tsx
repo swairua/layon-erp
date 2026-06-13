@@ -136,6 +136,9 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
   const [termsAndConditions, setTermsAndConditions] = useState('');
   const [showCalculatedValuesInTerms, setShowCalculatedValuesInTerms] = useState(false);
   const [currency, setCurrency] = useState('KES');
+  const [taxAmount, setTaxAmount] = useState<number | ''>('');
+  const [attachmentUrl, setAttachmentUrl] = useState('');
+  const [boqStatus, setBoqStatus] = useState('draft');
   const [sections, setSections] = useState<BOQSectionRow[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -170,6 +173,8 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
         });
       });
 
+      const finalTaxAmount = typeof changes.taxAmount === 'number' ? changes.taxAmount : 0;
+      const finalTotal = filledSubtotal + finalTaxAmount;
       const draftData = {
         number: changes.boqNumber,
         boq_date: changes.boqDate,
@@ -185,8 +190,9 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
         project_title: changes.projectTitle || null,
         currency: changes.currency,
         subtotal: filledSubtotal,
-        tax_amount: 0,
-        total_amount: filledSubtotal,
+        tax_amount: finalTaxAmount,
+        total_amount: finalTotal,
+        attachment_url: changes.attachmentUrl || null,
         data: {
           sections: filledSections.map((s: any) => ({
             title: s.title,
@@ -209,6 +215,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
         },
         termsAndConditions: changes.termsAndConditions || null,
         showCalculatedValuesInTerms: changes.showCalculatedValuesInTerms,
+        status: changes.boqStatus || 'draft',
       };
 
       const result = await saveEditingDraft(profile.id, currentCompany.id, boq.id, draftData);
@@ -247,13 +254,16 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
       contractor,
       projectTitle,
       currency,
+      taxAmount,
+      attachmentUrl,
+      boqStatus,
       units,
       notes,
       termsAndConditions,
       showCalculatedValuesInTerms,
       sections,
     };
-  }, [boqNumber, boqDate, dueDate, clientId, selectedClient, contractor, projectTitle, currency, units, notes, termsAndConditions, showCalculatedValuesInTerms, sections]);
+  }, [boqNumber, boqDate, dueDate, clientId, selectedClient, contractor, projectTitle, currency, taxAmount, attachmentUrl, boqStatus, units, notes, termsAndConditions, showCalculatedValuesInTerms, sections]);
 
   // Debounce autosave to 5 seconds
   const debouncedAutosave = useDebounce(performAutosave, 5000);
@@ -327,6 +337,10 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
 
           const currencyToUse = dataToUse.currency || boqData.currency || 'KES';
           setCurrency(currencyToUse);
+
+          setTaxAmount(dataToUse.tax_amount || '');
+          setAttachmentUrl(dataToUse.attachment_url || '');
+          setBoqStatus(dataToUse.status || 'draft');
 
           const clientName = dataToUse.client_name || boqData.client_name;
           const clientIdFromBoq = clientName ? customers.find(c => c.name === clientName)?.id : undefined;
@@ -499,8 +513,9 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
   const totals = useMemo(() => {
     let subtotal = 0;
     sections.forEach(sec => { subtotal += calculateSectionTotal(sec); });
-    return { subtotal };
-  }, [sections]);
+    const tax = typeof taxAmount === 'number' ? taxAmount : 0;
+    return { subtotal, tax, total: subtotal + tax };
+  }, [sections, taxAmount]);
 
   const isItemEmpty = (item: BOQItemRow): boolean => {
     return !item.description.trim() && item.quantity === 1 && item.rate === 0;
@@ -593,6 +608,8 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
         // This ensures single source of truth for terms_and_conditions and show_calculated_values_in_terms
       };
 
+      const finalTaxAmount = typeof taxAmount === 'number' ? taxAmount : 0;
+      const finalTotal = filledSubtotal + finalTaxAmount;
       const payload = {
         number: boqNumber,
         boq_date: boqDate,
@@ -607,11 +624,13 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
         project_title: projectTitle || null,
         currency: currency,
         subtotal: filledSubtotal,
-        tax_amount: 0,
-        total_amount: filledSubtotal,
+        tax_amount: finalTaxAmount,
+        total_amount: finalTotal,
+        attachment_url: attachmentUrl || null,
         data: doc,
         termsAndConditions: termsAndConditions || null,
         showCalculatedValuesInTerms: showCalculatedValuesInTerms,
+        status: boqStatus,
       };
 
       const { error: updateError } = await supabase.from('boqs').update(payload).eq('id', boq.id);
@@ -725,6 +744,29 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>Tax Amount</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={taxAmount}
+                onChange={e => { setTaxAmount(e.target.value === '' ? '' : Number(e.target.value)); triggerAutosave(); }}
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={boqStatus} onValueChange={(val) => { setBoqStatus(val); triggerAutosave(); }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div>
@@ -749,6 +791,14 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
             <div>
               <Label>Contractor</Label>
               <Input value={contractor} onChange={e => { setContractor(e.target.value); triggerAutosave(); }} />
+            </div>
+            <div>
+              <Label>Attachment URL</Label>
+              <Input
+                value={attachmentUrl}
+                onChange={e => { setAttachmentUrl(e.target.value); triggerAutosave(); }}
+                placeholder="https://example.com/attachment.pdf"
+              />
             </div>
           </div>
 
@@ -898,7 +948,11 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
               ))}
 
               <div className="flex items-center justify-end gap-6 pt-4">
-                <div className="text-lg font-semibold">Subtotal: {formatCurrency(totals.subtotal)}</div>
+                <div className="space-y-2">
+                  <div className="text-lg font-semibold">Subtotal: {formatCurrency(totals.subtotal)}</div>
+                  <div className="text-lg font-semibold">Tax: {formatCurrency(totals.tax)}</div>
+                  <div className="text-xl font-bold border-t pt-2">Total: {formatCurrency(totals.total)}</div>
+                </div>
               </div>
             </CardContent>
           </Card>
