@@ -1,48 +1,47 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
-import { Lock } from 'lucide-react';
+import { Lock, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { hasFeature } from '@/utils/rolePermissions';
+import type { FeatureKey, UserRole } from '@/utils/rolePermissions';
 
 interface ProtectedRouteProps {
   children: ReactNode;
   fallback?: ReactNode;
   requireAuth?: boolean;
+  allowedRoles?: UserRole[];
+  requiredFeature?: FeatureKey;
 }
 
 export function ProtectedRoute({
   children,
   fallback,
   requireAuth = true,
+  allowedRoles,
+  requiredFeature,
 }: ProtectedRouteProps) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, profile } = useAuth();
   const [sessionVerified, setSessionVerified] = useState(false);
   const [verifyingSession, setVerifyingSession] = useState(false);
 
   useEffect(() => {
-    // If context says we're authenticated, no need to verify
     if (isAuthenticated) {
       setSessionVerified(true);
       return;
     }
+    if (loading) return;
 
-    // If still loading, wait for initial load
-    if (loading) {
-      return;
-    }
-
-    // If loading is complete and we're not authenticated, verify Supabase session as fallback
     const verifySuperbaseSession = async () => {
       setVerifyingSession(true);
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          console.log('✅ [ProtectedRoute] Session verified via Supabase fallback');
           setSessionVerified(true);
         }
-      } catch (error) {
-        console.error('[ProtectedRoute] Error verifying session:', error);
+      } catch {
+        // ignore
       } finally {
         setVerifyingSession(false);
       }
@@ -51,7 +50,6 @@ export function ProtectedRoute({
     verifySuperbaseSession();
   }, [isAuthenticated, loading]);
 
-  // Show loading state while checking session
   if (loading || verifyingSession) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -63,7 +61,6 @@ export function ProtectedRoute({
     );
   }
 
-  // Check authentication: context state OR verified session
   if (requireAuth && !isAuthenticated && !sessionVerified) {
     return fallback || (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -83,10 +80,43 @@ export function ProtectedRoute({
     );
   }
 
+  const role = profile?.role as UserRole | undefined;
+
+  if (allowedRoles && role && !allowedRoles.includes(role)) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="w-full max-w-md text-center">
+          <CardContent className="pt-6">
+            <ShieldAlert className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Access Denied</h3>
+            <p className="text-muted-foreground mb-4">
+              You don't have the required permissions to access this page.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (requiredFeature && role && !hasFeature(role, requiredFeature)) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="w-full max-w-md text-center">
+          <CardContent className="pt-6">
+            <ShieldAlert className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Access Denied</h3>
+            <p className="text-muted-foreground mb-4">
+              You don't have permission to access this feature.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return <>{children}</>;
 }
 
-// Higher-order component for protecting routes
 export function withProtectedRoute<P extends object>(
   Component: React.ComponentType<P>,
   protection: Omit<ProtectedRouteProps, 'children'>

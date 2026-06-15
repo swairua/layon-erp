@@ -28,12 +28,13 @@ const Inventory = lazy(() => import("./pages/Inventory"));
 const Customers = lazy(() => import("./pages/Customers"));
 const DeliveryNotes = lazy(() => import("./pages/DeliveryNotes"));
 const Proforma = lazy(() => import("./pages/Proforma"));
-const ReportsDashboard = lazy(() => import("./pages/reports/Dashboard"));
+const ReportsOverview = lazy(() => import("./pages/reports/ReportsOverview"));
 const SalesReports = lazy(() => import("./pages/reports/SalesReports"));
 const InventoryReports = lazy(() => import("./pages/reports/InventoryReports"));
 const StatementOfAccounts = lazy(() => import("./pages/reports/StatementOfAccounts"));
 const CompanySettings = lazy(() => import("./pages/settings/CompanySettings"));
 const UserManagement = lazy(() => import("./pages/settings/UserManagement"));
+const UserPermissions = lazy(() => import("./pages/settings/UserPermissions"));
 const UnitsSettings = lazy(() => import("./pages/settings/Units"));
 const UnitsNormalize = lazy(() => import("./pages/settings/UnitsNormalize"));
 const RemittanceAdvice = lazy(() => import("./pages/RemittanceAdvice"));
@@ -423,7 +424,7 @@ const App = () => {
             path="/payments"
             element={
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-                <ProtectedRoute>
+                <ProtectedRoute requiredFeature="payments">
                   <Payments />
                 </ProtectedRoute>
               </Suspense>
@@ -433,7 +434,7 @@ const App = () => {
             path="/payments/new"
             element={
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-                <ProtectedRoute>
+                <ProtectedRoute requiredFeature="payments">
                   <Payments />
                 </ProtectedRoute>
               </Suspense>
@@ -443,7 +444,7 @@ const App = () => {
             path="/receipts"
             element={
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-                <ProtectedRoute>
+                <ProtectedRoute requiredFeature="payments">
                   <Payments />
                 </ProtectedRoute>
               </Suspense>
@@ -555,7 +556,7 @@ const App = () => {
             path="/inventory"
             element={
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-                <ProtectedRoute>
+                <ProtectedRoute requiredFeature="products">
                   <Inventory />
                 </ProtectedRoute>
               </Suspense>
@@ -565,7 +566,7 @@ const App = () => {
             path="/inventory/new"
             element={
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-                <ProtectedRoute>
+                <ProtectedRoute requiredFeature="products">
                   <Inventory />
                 </ProtectedRoute>
               </Suspense>
@@ -575,7 +576,7 @@ const App = () => {
             path="/delivery-notes"
             element={
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-                <ProtectedRoute>
+                <ProtectedRoute requiredFeature="delivery-notes">
                   <DeliveryNotes />
                 </ProtectedRoute>
               </Suspense>
@@ -596,11 +597,11 @@ const App = () => {
 
           {/* Reports */}
           <Route
-            path="/reports/dashboard"
+            path="/reports"
             element={
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-                <ProtectedRoute>
-                  <ReportsDashboard />
+                <ProtectedRoute requiredFeature="reports-overview">
+                  <ReportsOverview />
                 </ProtectedRoute>
               </Suspense>
             }
@@ -609,7 +610,7 @@ const App = () => {
             path="/reports/sales"
             element={
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-                <ProtectedRoute>
+                <ProtectedRoute requiredFeature="reports-sales">
                   <SalesReports />
                 </ProtectedRoute>
               </Suspense>
@@ -619,7 +620,7 @@ const App = () => {
             path="/reports/inventory"
             element={
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-                <ProtectedRoute>
+                <ProtectedRoute requiredFeature="reports-inventory">
                   <InventoryReports />
                 </ProtectedRoute>
               </Suspense>
@@ -629,7 +630,7 @@ const App = () => {
             path="/reports/statements"
             element={
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-                <ProtectedRoute>
+                <ProtectedRoute requiredFeature="reports-statements">
                   <StatementOfAccounts />
                 </ProtectedRoute>
               </Suspense>
@@ -641,7 +642,7 @@ const App = () => {
             path="/settings/company"
             element={
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-                <ProtectedRoute>
+                <ProtectedRoute requiredFeature="settings-company">
                   <CompanySettings />
                 </ProtectedRoute>
               </Suspense>
@@ -651,7 +652,7 @@ const App = () => {
             path="/settings/users"
             element={
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-                <ProtectedRoute>
+                <ProtectedRoute requiredFeature="settings-users">
                   <UserManagement />
                 </ProtectedRoute>
               </Suspense>
@@ -661,7 +662,7 @@ const App = () => {
             path="/settings/units"
             element={
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-                <ProtectedRoute>
+                <ProtectedRoute requiredFeature="settings-company">
                   <UnitsSettings />
                 </ProtectedRoute>
               </Suspense>
@@ -671,8 +672,19 @@ const App = () => {
             path="/settings/units/normalize"
             element={
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-                <ProtectedRoute>
+                <ProtectedRoute requiredFeature="settings-company">
                   <UnitsNormalize />
+                </ProtectedRoute>
+              </Suspense>
+            }
+          />
+
+          <Route
+            path="/settings/permissions"
+            element={
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <ProtectedRoute requiredFeature="manage-permissions">
+                  <UserPermissions />
                 </ProtectedRoute>
               </Suspense>
             }
@@ -689,7 +701,7 @@ const App = () => {
             path="/audit-logs"
             element={
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-                <ProtectedRoute>
+                <ProtectedRoute requiredFeature="audit-logs">
                   <AuditLogs />
                 </ProtectedRoute>
               </Suspense>

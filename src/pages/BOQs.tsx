@@ -411,56 +411,72 @@ export default function BOQs() {
 
   const handleDeleteConfirm = async () => {
     if (!deleteDialog.boqId || !companyId) return;
+
+    const doDelete = async (includeCompanyId: boolean) => {
+      let q = supabase.from('boqs').delete().eq('id', deleteDialog.boqId);
+      if (includeCompanyId) q = q.eq('company_id', companyId);
+      const { error } = await q;
+      if (error) throw error;
+    };
+
     try {
-      // Simple direct delete without audit logging to work around audit_logs issues
-      const { error } = await supabase
-        .from('boqs')
-        .delete()
-        .eq('id', deleteDialog.boqId)
-        .eq('company_id', companyId);
-
-      if (error) {
-        throw error;
-      }
-
-      toast.success('BOQ deleted');
-      setDeleteDialog({ open: false });
-      refetchBOQs();
-
-      // Also refresh linked BOQ IDs in case any lcl_boqs records were affected
-      setLinkedBOQIds(prev => {
-        const updated = new Set(prev);
-        updated.delete(deleteDialog.boqId || '');
-        return updated;
-      });
+      await doDelete(true);
+      afterDelete();
     } catch (err) {
-      let errorMessage = 'Failed to delete BOQ';
-
-      // Extract error message from various error types
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      } else if (typeof err === 'object' && err !== null) {
-        // Handle Supabase error objects
-        if ('message' in err) {
-          errorMessage = String(err.message);
-        } else if ('details' in err) {
-          errorMessage = String(err.details);
-        } else {
-          errorMessage = JSON.stringify(err);
-        }
-      } else if (typeof err === 'string') {
-        errorMessage = err;
-      }
-
+      const errorMessage = extractErrorMessage(err);
       console.error('Delete failed:', errorMessage);
 
-      // Provide specific guidance for common errors
       if (errorMessage.includes('foreign key') || errorMessage.includes('constraint')) {
-        errorMessage = 'Cannot delete BOQ: It has been converted to an invoice or has related records. Please delete related records first.';
+        toast.error('Cannot delete BOQ: It has been converted to an invoice or has related records. Please delete related records first.');
+        return;
+      }
+
+      if (errorMessage.includes('company_id') && errorMessage.includes('does not exist')) {
+        try {
+          await doDelete(false);
+          afterDelete();
+          return;
+        } catch (fallbackErr) {
+          const fallbackErrMsg = typeof fallbackErr === 'object' && fallbackErr !== null && 'message' in fallbackErr
+            ? String(fallbackErr.message) : String(fallbackErr);
+          if (fallbackErrMsg.includes('company_id') && fallbackErrMsg.includes('does not exist')) {
+            const alterSQL = "ALTER TABLE boqs ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES companies(id) ON DELETE CASCADE;";
+            navigator.clipboard.writeText(alterSQL).catch(() => {});
+            toast.error('Missing company_id column on boqs table', {
+              description: 'SQL to fix copied to clipboard. Run this in Supabase SQL Editor:\n' + alterSQL,
+              duration: 15000,
+            });
+            return;
+          }
+          toast.error(fallbackErrMsg);
+          return;
+        }
       }
 
       toast.error(errorMessage);
     }
+  };
+
+  const afterDelete = () => {
+    toast.success('BOQ deleted');
+    setDeleteDialog({ open: false });
+    refetchBOQs();
+    setLinkedBOQIds(prev => {
+      const updated = new Set(prev);
+      updated.delete(deleteDialog.boqId || '');
+      return updated;
+    });
+  };
+
+  const extractErrorMessage = (err: unknown): string => {
+    if (err instanceof Error) return err.message;
+    if (typeof err === 'object' && err !== null) {
+      if ('message' in err) return String(err.message);
+      if ('details' in err) return String(err.details);
+      return JSON.stringify(err);
+    }
+    if (typeof err === 'string') return err;
+    return 'Failed to delete BOQ';
   };
 
   const handleConvertClick = (id: string, number: string, isLCL: boolean = false) => {

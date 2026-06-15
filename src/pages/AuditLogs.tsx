@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { hasFeature } from '@/utils/rolePermissions';
+import type { UserRole } from '@/utils/rolePermissions';
 
 export function AuditLogs() {
   const { user, profile, loading, isAdmin } = useAuth();
@@ -45,9 +47,8 @@ export function AuditLogs() {
     );
   }
 
-  const isSalesAccount = profile?.email?.toLowerCase() === 'sales@layonsconstruction.com';
-
-  if (isSalesAccount) {
+  const role = (profile?.role || 'user') as UserRole;
+  if (!hasFeature(role, 'audit-logs')) {
     return (
       <div className="space-y-6 p-6">
         <Alert className="border-red-200 bg-red-50">

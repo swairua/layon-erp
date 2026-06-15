@@ -14,6 +14,8 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useCompanies, useUpdateCompany, useCreateCompany, useTaxSettings, useCreateTaxSetting, useUpdateTaxSetting, useDeleteTaxSetting } from '@/hooks/useDatabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { hasFeature } from '@/utils/rolePermissions';
+import type { UserRole } from '@/utils/rolePermissions';
 import { toast } from 'sonner';
 import { ForceTaxSettings } from '@/components/ForceTaxSettings';
 import { ConfirmationDialog } from '@/components/ConfirmationDialog';
@@ -25,10 +27,9 @@ import { addCurrencyColumn, ADD_CURRENCY_COLUMN_SQL } from '@/utils/addCurrencyC
 
 export default function CompanySettings() {
   const { profile } = useAuth();
+  const role = (profile?.role || 'user') as UserRole;
 
-  const isSalesAccount = profile?.email?.toLowerCase() === 'sales@layonsconstruction.com';
-
-  if (isSalesAccount) {
+  if (!hasFeature(role, 'settings-company')) {
     return (
       <div className="space-y-6 p-6">
         <Alert className="border-red-200 bg-red-50">

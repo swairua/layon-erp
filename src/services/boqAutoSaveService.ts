@@ -86,29 +86,27 @@ export async function saveBoqDraft(
       client_email: formData.customerEmail || null,
       client_phone: formData.customerPhone || null,
       client_address: formData.customerAddress || null,
-      client_city: formData.customerCity || null,
-      client_country: formData.customerCountry || null,
+      client_city: formData.clientCity || null,
+      client_country: formData.clientCountry || null,
       contractor: formData.contractor || null,
       project_title: formData.projectTitle || null,
       currency: formData.currency || 'KES',
       subtotal: formData.subtotal || 0,
       tax_amount: formData.taxAmount || 0,
       total_amount: formData.totalAmount || 0,
-      attachment_url: formData.attachmentUrl || null,
       data: {
         sections: formData.sections,
         notes: formData.notes,
       },
       terms_and_conditions: formData.termsAndConditions || null,
-      showCalculatedValuesInTerms: formData.showCalculatedValuesInTerms || false,
-      status: formData.boqStatus || 'draft',
+      show_calculated_values_in_terms: formData.showCalculatedValuesInTerms || false,
       updated_at: new Date().toISOString(),
       last_autosaved_at: new Date().toISOString(),
     };
 
-    if (draftToken) {
-      payload.draft_token = draftToken;
-    }
+    if (formData.attachmentUrl) payload.attachment_url = formData.attachmentUrl;
+    if (formData.boqStatus) payload.status = formData.boqStatus;
+    if (draftToken) payload.draft_token = draftToken;
 
     let draftId: string | undefined;
 
@@ -413,7 +411,7 @@ export async function saveEditingDraft(
       return { success: false, error: 'User ID, Company ID, and BOQ ID are required' };
     }
 
-    const payload = {
+    const payload: Record<string, any> = {
       company_id: companyId,
       user_id: userId,
       boq_id: boqId,
@@ -433,14 +431,15 @@ export async function saveEditingDraft(
       subtotal: boqData.subtotal || 0,
       tax_amount: boqData.tax_amount || 0,
       total_amount: boqData.total_amount || 0,
-      attachment_url: boqData.attachment_url || null,
       data: boqData.data,
-      termsAndConditions: boqData.termsAndConditions || null,
-      showCalculatedValuesInTerms: boqData.showCalculatedValuesInTerms || false,
-      status: boqData.status || 'draft',
+      terms_and_conditions: boqData.termsAndConditions || null,
+      show_calculated_values_in_terms: boqData.showCalculatedValuesInTerms || false,
       updated_at: new Date().toISOString(),
       last_autosaved_at: new Date().toISOString(),
     };
+
+    if (boqData.attachment_url) payload.attachment_url = boqData.attachment_url;
+    if (boqData.status) payload.status = boqData.status;
 
     // Check if an existing edit draft exists for this BOQ
     const { data: existingDraft, error: fetchError } = await supabase

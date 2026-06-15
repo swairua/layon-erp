@@ -6,22 +6,14 @@ export interface AuditedDeleteOptions {
   userId: string;
   userFullName?: string;
   userEmail?: string;
-  ipAddress?: string;
-  userAgent?: string;
 }
 
 export interface DeleteTarget {
   entityType: string;
   entityId: string;
-  entityName?: string;
-  entityNumber?: string;
   deletedData?: Record<string, any>;
 }
 
-/**
- * Performs a delete operation with automatic audit logging
- * This is the centralized function that ALL delete operations should use
- */
 export async function performAuditedDelete(
   tableName: string,
   whereKey: string,
@@ -30,7 +22,6 @@ export async function performAuditedDelete(
   options: AuditedDeleteOptions
 ): Promise<{ success: boolean; error?: Error }> {
   try {
-    // Fetch the full record before deletion for audit purposes
     const { data: recordToDelete, error: fetchError } = await supabase
       .from(tableName)
       .select('*')
@@ -41,7 +32,6 @@ export async function performAuditedDelete(
       console.warn(`Warning: Could not fetch ${tableName} record for audit:`, fetchError);
     }
 
-    // Perform the deletion
     const { error: deleteError } = await supabase
       .from(tableName)
       .delete()
@@ -53,63 +43,33 @@ export async function performAuditedDelete(
       return { success: false, error: new Error(errorMessage) };
     }
 
-    // Log the deletion to audit_logs
-    const auditData = {
+    const auditPayload = {
       company_id: options.companyId,
-      user_id: options.userId,
+      actor_user_id: options.userId,
+      actor_email: options.userEmail || null,
       action: 'delete',
       entity_type: target.entityType,
-      entity_id: target.entityId,
-      entity_name: target.entityName,
-      entity_number: target.entityNumber,
+      record_id: target.entityId,
       details: {
         deletedAt: new Date().toISOString(),
         deletedBy: options.userFullName || options.userEmail || 'Unknown',
         tableName,
         whereKey,
         whereValue,
+        ...(target.deletedData || recordToDelete ? { deletedData: target.deletedData || recordToDelete } : {}),
       },
-      deleted_data: target.deletedData || recordToDelete || null,
-      ip_address: options.ipAddress || null,
-      user_agent: options.userAgent || null,
     };
 
-    // Attempt to insert audit log; if insert fails, log but continue with delete
     try {
       const { error: auditError } = await supabase
         .from('audit_logs')
-        .insert([auditData]);
+        .insert([auditPayload]);
 
       if (auditError) {
-        console.error('Failed to log deletion to audit_logs (full attempt):', auditError);
-
-        // If full audit insert fails, try with minimal payload
-        try {
-          const minimalAudit = {
-            user_id: options.userId,
-            action: 'delete',
-            entity_type: target.entityType,
-            entity_id: target.entityId,
-            entity_name: target.entityName,
-            details: auditData.details,
-          };
-
-          const { error: auditError2 } = await supabase
-            .from('audit_logs')
-            .insert([minimalAudit]);
-
-          if (auditError2) {
-            console.warn('Failed to log deletion to audit_logs (minimal attempt):', auditError2);
-            // Continue - deletion already succeeded, just audit logging failed
-          }
-        } catch (minimalErr) {
-          console.warn('Minimal audit insert also failed:', minimalErr);
-          // Continue - deletion already succeeded, just audit logging failed
-        }
+        console.error('Failed to log deletion to audit_logs:', auditError);
       }
-    } catch (auditInsertErr) {
-      console.warn('Unexpected error while logging audit deletion:', auditInsertErr);
-      // Do not fail the delete for audit logging issues - deletion already succeeded
+    } catch (auditErr) {
+      console.warn('Unexpected error while logging audit deletion:', auditErr);
     }
 
     return { success: true };
@@ -121,10 +81,6 @@ export async function performAuditedDelete(
   }
 }
 
-/**
- * Performs a delete operation for related records (e.g., deleting all items for a parent record)
- * Useful for cascade deletes
- */
 export async function performAuditedDeleteMultiple(
   tableName: string,
   whereKey: string,
@@ -133,7 +89,6 @@ export async function performAuditedDeleteMultiple(
   options: AuditedDeleteOptions
 ): Promise<{ success: boolean; deletedCount?: number; error?: Error }> {
   try {
-    // Fetch the full records before deletion for audit purposes
     const { data: recordsToDelete, error: fetchError } = await supabase
       .from(tableName)
       .select('*')
@@ -143,7 +98,6 @@ export async function performAuditedDeleteMultiple(
       console.warn(`Warning: Could not fetch ${tableName} records for audit:`, fetchError);
     }
 
-    // Perform the deletion
     const { error: deleteError } = await supabase
       .from(tableName)
       .delete()
@@ -155,15 +109,13 @@ export async function performAuditedDeleteMultiple(
       return { success: false, error: new Error(errorMessage) };
     }
 
-    // Log each deletion to audit_logs
     const auditEntries = target.entityIds.map((entityId) => ({
       company_id: options.companyId,
-      user_id: options.userId,
+      actor_user_id: options.userId,
+      actor_email: options.userEmail || null,
       action: 'delete',
       entity_type: target.entityType,
-      entity_id: entityId,
-      entity_name: target.entityName,
-      entity_number: target.entityNumber,
+      record_id: entityId,
       details: {
         deletedAt: new Date().toISOString(),
         deletedBy: options.userFullName || options.userEmail || 'Unknown',
@@ -172,9 +124,6 @@ export async function performAuditedDeleteMultiple(
         whereValue,
         cascadeDelete: true,
       },
-      deleted_data: null,
-      ip_address: options.ipAddress || null,
-      user_agent: options.userAgent || null,
     }));
 
     if (auditEntries.length > 0) {
@@ -184,32 +133,10 @@ export async function performAuditedDeleteMultiple(
           .insert(auditEntries);
 
         if (auditError) {
-          console.warn('Failed to log deletions to audit_logs (full attempt):', auditError);
-          // Try with minimal entries
-          try {
-            const minimalEntries = auditEntries.map(e => ({
-              user_id: e.user_id,
-              action: e.action,
-              entity_type: e.entity_type,
-              entity_id: e.entity_id,
-              entity_name: e.entity_name,
-              details: e.details,
-            }));
-            const { error: auditError2 } = await supabase
-              .from('audit_logs')
-              .insert(minimalEntries);
-            if (auditError2) {
-              console.warn('Failed to log deletions to audit_logs (minimal attempt):', auditError2);
-              // Continue - deletion already succeeded
-            }
-          } catch (minimalErr) {
-            console.warn('Minimal audit insert also failed:', minimalErr);
-            // Continue - deletion already succeeded
-          }
+          console.warn('Failed to log deletions to audit_logs:', auditError);
         }
-      } catch (auditInsertErr) {
-        console.warn('Unexpected error while logging audit deletions:', auditInsertErr);
-        // Continue - deletion already succeeded, just audit logging failed
+      } catch (auditErr) {
+        console.warn('Unexpected error while logging audit deletions:', auditErr);
       }
     }
 
@@ -220,29 +147,4 @@ export async function performAuditedDeleteMultiple(
     console.error('Error in performAuditedDeleteMultiple:', err, `- Message: ${errorMessage}`);
     return { success: false, error };
   }
-}
-
-/**
- * Helper function to get client IP
- */
-export async function getClientIp(): Promise<string | null> {
-  try {
-    const response = await fetch('https://api.ipify.org?format=json', {
-      signal: AbortSignal.timeout(3000),
-    });
-    const data = await response.json();
-    return data.ip;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Helper function to get user agent
- */
-export function getUserAgent(): string | null {
-  if (typeof window !== 'undefined') {
-    return window.navigator.userAgent;
-  }
-  return null;
 }

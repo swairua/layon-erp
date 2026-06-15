@@ -51,6 +51,7 @@ export default function LCLTemplate() {
   const [initialItems, setInitialItems] = useState<ItemSnapshot[]>([]);
   const [structureId, setStructureId] = useState<string>('');
   const [templateStructure, setTemplateStructure] = useState<LCLTemplateStructure | null>(null);
+  const loadCompletedRef = useRef(false);
 
   // Prevent accidental unmounting/cleanup
   useEffect(() => {
@@ -93,6 +94,7 @@ export default function LCLTemplate() {
       setTemplateStructure(lclDefaultStructure);
 
       // Phase 2: Load hierarchical data and secondary data (latest BOQ + next number) in parallel
+      loadCompletedRef.current = false;
       console.log(`[LCLTemplate] Loading hierarchical data for structure ID: ${lclDefaultStructure.id}`);
       try {
         const [data, latestBoq, nextNumber] = await Promise.all([
@@ -102,6 +104,7 @@ export default function LCLTemplate() {
         ]);
 
         console.log(`[LCLTemplate] Hierarchical data loaded successfully`);
+        loadCompletedRef.current = true;
         setHierarchicalData(data);
         setStructureId(lclDefaultStructure.id);
 
@@ -347,7 +350,6 @@ export default function LCLTemplate() {
     };
   }, [selectedCustomerId, projectTitle, boqDate]);
 
-  // Safety net: force loading to false after 15s
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 15000);
     return () => clearTimeout(t);
@@ -438,11 +440,18 @@ export default function LCLTemplate() {
   if (!hierarchicalData) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-4 max-w-md">
           <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
           <h2 className="text-xl font-semibold">Unable to Load LCL BOQ Template</h2>
-          <p className="text-muted-foreground">The LCL BOQ template could not be loaded. Please try refreshing the page.</p>
-          <Button onClick={() => window.location.reload()}>Refresh Page</Button>
+          <p className="text-muted-foreground">The LCL BOQ template could not be loaded. This may be due to a missing template setup or a slow connection. Please try again or contact your administrator if the problem persists.</p>
+          <div className="flex gap-2 justify-center">
+            <Button variant="default" onClick={() => window.location.reload()}>
+              Refresh Page
+            </Button>
+            <Button variant="outline" onClick={() => window.location.href = '/dashboard'}>
+              Go to Dashboard
+            </Button>
+          </div>
         </div>
       </div>
     );

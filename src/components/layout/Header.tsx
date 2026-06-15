@@ -13,6 +13,8 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
+import { hasFeature } from '@/utils/rolePermissions';
+import type { UserRole } from '@/utils/rolePermissions';
 import { SignInModal } from '@/components/auth/SignInModal';
 import { ForgotPasswordModal } from '@/components/auth/ForgotPasswordModal';
 import { ProfileModal } from '@/components/profile/ProfileModal';
@@ -24,6 +26,7 @@ interface HeaderProps {
 
 export function Header({ sidebarOpen = false, onToggleSidebar = () => {} }: HeaderProps) {
   const { user, profile, signOut, isAuthenticated } = useAuth();
+  const role = (profile?.role || 'user') as UserRole;
   const [authModal, setAuthModal] = useState<'signin' | 'forgot' | null>(null);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
 
@@ -44,6 +47,8 @@ export function Header({ sidebarOpen = false, onToggleSidebar = () => {} }: Head
         return 'Accountant';
       case 'stock_manager':
         return 'Stock Manager';
+      case 'sales':
+        return 'Sales';
       case 'user':
         return 'User';
       default:
@@ -59,6 +64,8 @@ export function Header({ sidebarOpen = false, onToggleSidebar = () => {} }: Head
         return 'bg-primary-light text-primary border-primary/20';
       case 'stock_manager':
         return 'bg-warning-light text-warning border-warning/20';
+      case 'sales':
+        return 'bg-primary-light text-primary border-primary/20';
       case 'user':
         return 'bg-success-light text-success border-success/20';
       default:
@@ -151,7 +158,7 @@ export function Header({ sidebarOpen = false, onToggleSidebar = () => {} }: Head
                     <User className="mr-2 h-4 w-4" />
                     Profile Settings
                   </DropdownMenuItem>
-                  {profile?.role === 'admin' && (
+                  {hasFeature(role, 'settings-company') && (
                     <DropdownMenuItem>
                       Company Settings
                     </DropdownMenuItem>

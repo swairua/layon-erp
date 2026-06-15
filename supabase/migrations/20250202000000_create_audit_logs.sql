@@ -1,32 +1,29 @@
--- Create audit_logs table for tracking all delete actions
+-- Create audit_logs table for tracking all user actions
 CREATE TABLE IF NOT EXISTS audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+  actor_user_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  actor_email TEXT,
   action VARCHAR(50) NOT NULL CHECK (action IN ('delete', 'create', 'update', 'restore')),
   entity_type VARCHAR(100) NOT NULL,
-  entity_id UUID NOT NULL,
-  entity_name VARCHAR(255),
-  entity_number VARCHAR(100),
+  record_id UUID,
   details JSONB,
-  deleted_data JSONB,
-  timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  ip_address INET,
-  user_agent TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Create indexes for efficient querying
 CREATE INDEX IF NOT EXISTS idx_audit_logs_company_id ON audit_logs(company_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_user_id ON audit_logs(actor_user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_type ON audit_logs(entity_type);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
 
 -- Add RLS policies
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can view audit logs for their company
+DROP POLICY IF EXISTS audit_logs_select_policy ON audit_logs;
 CREATE POLICY audit_logs_select_policy ON audit_logs
   FOR SELECT
   USING (
@@ -35,7 +32,8 @@ CREATE POLICY audit_logs_select_policy ON audit_logs
     )
   );
 
--- Policy: Only authenticated users can insert audit logs (via function)
+-- Policy: Only authenticated users can insert audit logs
+DROP POLICY IF EXISTS audit_logs_insert_policy ON audit_logs;
 CREATE POLICY audit_logs_insert_policy ON audit_logs
   FOR INSERT
   WITH CHECK (
@@ -44,43 +42,37 @@ CREATE POLICY audit_logs_insert_policy ON audit_logs
     )
   );
 
--- Function to automatically log deletions
+-- Function to programmatically log audit events
 CREATE OR REPLACE FUNCTION log_audit_event(
   p_company_id UUID,
-  p_user_id UUID,
+  p_actor_user_id UUID,
+  p_actor_email TEXT DEFAULT NULL,
   p_action VARCHAR,
   p_entity_type VARCHAR,
-  p_entity_id UUID,
-  p_entity_name VARCHAR,
-  p_entity_number VARCHAR,
-  p_details JSONB,
-  p_deleted_data JSONB DEFAULT NULL
+  p_record_id UUID DEFAULT NULL,
+  p_details JSONB DEFAULT NULL
 ) RETURNS UUID AS $$
 DECLARE
   v_log_id UUID;
 BEGIN
   INSERT INTO audit_logs (
     company_id,
-    user_id,
+    actor_user_id,
+    actor_email,
     action,
     entity_type,
-    entity_id,
-    entity_name,
-    entity_number,
-    details,
-    deleted_data
+    record_id,
+    details
   ) VALUES (
     p_company_id,
-    p_user_id,
+    p_actor_user_id,
+    p_actor_email,
     p_action,
     p_entity_type,
-    p_entity_id,
-    p_entity_name,
-    p_entity_number,
-    p_details,
-    p_deleted_data
+    p_record_id,
+    p_details
   ) RETURNING id INTO v_log_id;
-  
+
   RETURN v_log_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

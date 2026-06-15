@@ -831,9 +831,12 @@ export function LCLTemplateEditor({
           <div key={section.section_id} className="border border-border rounded-lg">
             {/* Section header */}
             <div className="flex items-center justify-between p-4 hover:bg-muted transition-colors border-b border-border">
-              <button
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={() => toggleSection(section.section_id)}
-                className="flex-1 flex items-center justify-between gap-3"
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleSection(section.section_id); }}
+                className="flex-1 flex items-center justify-between gap-3 cursor-pointer"
               >
                 <div className="flex items-center gap-3">
                   {expandedSections.has(section.section_id) ? (
@@ -889,7 +892,7 @@ export function LCLTemplateEditor({
                 <p className="text-sm font-medium">
                   Section Total (KES): Ksh{formatLCLAmount(totals[section.section_id]?.section || 0)}
                 </p>
-              </button>
+              </div>
               <Button
                 size="sm"
                 variant="ghost"

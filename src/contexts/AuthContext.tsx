@@ -7,7 +7,7 @@ import { logError, getUserFriendlyErrorMessage, isErrorType } from '@/utils/erro
 import { parseErrorMessage } from '@/utils/errorHelpers';
 
 // Type definitions for user roles and statuses
-export type UserRole = 'admin' | 'accountant' | 'stock_manager' | 'user';
+export type UserRole = 'admin' | 'accountant' | 'stock_manager' | 'user' | 'sales';
 export type UserStatus = 'active' | 'inactive' | 'pending';
 
 // Helper function to safely format error for display
@@ -84,9 +84,7 @@ export const useAuth = () => {
 
 export const useIsSalesAccount = () => {
   const { profile, loading } = useAuth();
-  const isSalesAccount =
-    profile?.email?.toLowerCase().trim() === 'sales@layonsconstruction.com' &&
-    profile?.role === 'user';
+  const isSalesAccount = profile?.role === 'sales';
   return { isSalesAccount, isLoading: loading };
 };
 

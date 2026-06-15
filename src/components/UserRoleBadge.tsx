@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge';
-import { Shield, User, DollarSign, Package } from 'lucide-react';
+import { Shield, User, DollarSign, Package, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function UserRoleBadge() {
@@ -22,6 +22,8 @@ export function UserRoleBadge() {
         return <DollarSign className="h-3 w-3 mr-1" />;
       case 'stock_manager':
         return <Package className="h-3 w-3 mr-1" />;
+      case 'sales':
+        return <ShoppingCart className="h-3 w-3 mr-1" />;
       default:
         return <User className="h-3 w-3 mr-1" />;
     }
@@ -35,6 +37,8 @@ export function UserRoleBadge() {
         return 'bg-primary-light text-primary border-primary/20';
       case 'stock_manager':
         return 'bg-warning-light text-warning border-warning/20';
+      case 'sales':
+        return 'bg-sky-100 text-sky-700 border-sky-200';
       case 'user':
         return 'bg-success-light text-success border-success/20';
       default:
@@ -50,6 +54,8 @@ export function UserRoleBadge() {
         return 'Accountant';
       case 'stock_manager':
         return 'Stock Manager';
+      case 'sales':
+        return 'Sales';
       case 'user':
         return 'User';
       default:

@@ -888,10 +888,12 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
               }`}
             >
               <div className="flex items-center justify-between gap-4 px-4 py-3 bg-card">
-                <button
-                  type="button"
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => toggleSection(sectionLetter)}
-                  className="flex items-center gap-2 min-w-0 flex-1 text-left"
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleSection(sectionLetter); }}
+                  className="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer"
                 >
                   <ChevronRight
                     className={`h-4 w-4 shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
@@ -923,7 +925,7 @@ export const LCLBOQItemEditor = forwardRef<LCLBOQItemEditorHandle, LCLBOQItemEdi
                       SECTION {sectionLetter}: {getDisplaySectionName(sectionName)}
                     </button>
                   )}
-                </button>
+                </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="text-sm font-medium tabular-nums">
                     {formatNumberWithoutTrailingZeros(sectionTotal)}

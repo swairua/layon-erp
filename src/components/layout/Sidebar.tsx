@@ -19,62 +19,70 @@ import {
   History,
   BarChart3,
   X,
+  Shield,
 } from 'lucide-react';
 import { BiolegendLogo } from '@/components/ui/biolegend-logo';
 import { useCurrentCompany } from '@/contexts/CompanyContext';
-import { useIsSalesAccount } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { hasFeature } from '@/utils/rolePermissions';
+import type { FeatureKey, UserRole } from '@/utils/rolePermissions';
 
 interface SidebarItem {
   title: string;
   icon: React.ComponentType<{ className?: string }>;
   href?: string;
-  children?: SidebarItem[];
+  featureKey?: FeatureKey;
+  children?: (SidebarItem & { featureKey: FeatureKey })[];
 }
 
 const sidebarItems: SidebarItem[] = [
   {
     title: 'Dashboard',
     icon: Home,
-    href: '/'
+    href: '/',
+    featureKey: 'dashboard',
   },
   {
     title: 'Customers',
     icon: Users,
-    href: '/customers'
+    href: '/customers',
+    featureKey: 'customers',
   },
   {
     title: 'Products',
     icon: Package,
-    href: '/inventory'
+    href: '/inventory',
+    featureKey: 'products',
   },
   {
     title: 'Sales',
     icon: ShoppingCart,
     children: [
-      { title: 'Quotations', icon: FileText, href: '/quotations' },
-      { title: 'Invoices', icon: Receipt, href: '/invoices' },
-      { title: 'Delivery Notes', icon: Truck, href: '/delivery-notes' },
-      { title: 'Cash Receipts', icon: Receipt, href: '/cash-receipts' }
-    ]
+      { title: 'Quotations', icon: FileText, href: '/quotations', featureKey: 'quotations' },
+      { title: 'Invoices', icon: Receipt, href: '/invoices', featureKey: 'invoices' },
+      { title: 'Delivery Notes', icon: Truck, href: '/delivery-notes', featureKey: 'delivery-notes' },
+      { title: 'Cash Receipts', icon: Receipt, href: '/cash-receipts', featureKey: 'cash-receipts' },
+    ],
   },
   {
     title: 'BOQs',
     icon: FileSpreadsheet,
     children: [
-      { title: 'Standard BOQs', icon: FileSpreadsheet, href: '/boqs' },
-      { title: 'Fixed BOQ', icon: FileSpreadsheet, href: '/fixed-boq' },
-      { title: 'Hierarchical BOQ', icon: FileSpreadsheet, href: '/boq/hierarchical' },
-      { title: 'LCL Template', icon: FileSpreadsheet, href: '/lcl-template' },
-      { title: 'LCL BOQ List', icon: FileSpreadsheet, href: '/lcl-boq-list' }
-    ]
+      { title: 'Standard BOQs', icon: FileSpreadsheet, href: '/boqs', featureKey: 'boqs' },
+      { title: 'Fixed BOQ', icon: FileSpreadsheet, href: '/fixed-boq', featureKey: 'boqs' },
+      { title: 'Hierarchical BOQ', icon: FileSpreadsheet, href: '/boq/hierarchical', featureKey: 'boqs' },
+      { title: 'LCL Template', icon: FileSpreadsheet, href: '/lcl-template', featureKey: 'boqs' },
+      { title: 'LCL BOQ List', icon: FileSpreadsheet, href: '/lcl-boq-list', featureKey: 'boqs' },
+    ],
   },
   {
     title: 'Payments',
     icon: DollarSign,
+    featureKey: 'payments',
     children: [
-      { title: 'Payments', icon: DollarSign, href: '/payments' }
-    ]
+      { title: 'Payments', icon: DollarSign, href: '/payments', featureKey: 'payments' },
+    ],
   },
   {
     title: 'Reports',
@@ -86,16 +94,28 @@ const sidebarItems: SidebarItem[] = [
   {
     title: 'Audit Logs',
     icon: History,
-    href: '/audit-logs'
+    href: '/audit-logs',
+    featureKey: 'audit-logs',
+  },
+  {
+    title: 'Reports',
+    icon: BarChart3,
+    children: [
+      { title: 'Overview', icon: BarChart3, href: '/reports', featureKey: 'reports-overview' },
+      { title: 'Sales Reports', icon: BarChart3, href: '/reports/sales', featureKey: 'reports-sales' },
+      { title: 'Inventory Reports', icon: Package, href: '/reports/inventory', featureKey: 'reports-inventory' },
+      { title: 'Statement of Accounts', icon: FileText, href: '/reports/statements', featureKey: 'reports-statements' },
+    ],
   },
   {
     title: 'Settings',
     icon: Settings,
     children: [
-      { title: 'Company Settings', icon: Building2, href: '/settings/company' },
-      { title: 'User Management', icon: Users, href: '/settings/users' }
-    ]
-  }
+      { title: 'Company Settings', icon: Building2, href: '/settings/company', featureKey: 'settings-company' },
+      { title: 'User Management', icon: Users, href: '/settings/users', featureKey: 'settings-users' },
+      { title: 'Permissions', icon: Shield, href: '/settings/permissions', featureKey: 'manage-permissions' },
+    ],
+  },
 ];
 
 interface SidebarProps {
@@ -107,28 +127,28 @@ interface SidebarProps {
 export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }: SidebarProps) {
   const location = useLocation();
   const { currentCompany } = useCurrentCompany();
-  const { isSalesAccount, isLoading } = useIsSalesAccount();
+  const { profile } = useAuth();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
-  // Filter sidebar items based on user role
+  const role = (profile?.role || 'user') as UserRole;
+
   const filteredSidebarItems = useMemo(() => {
     return sidebarItems.filter(item => {
-      // Hide these items for sales accounts (apply filter immediately, don't wait for loading)
-      if (isSalesAccount && ['Payments', 'Audit Logs', 'Settings'].includes(item.title)) {
-        return false;
+      if (item.children) {
+        return item.children.some(child => hasFeature(role, child.featureKey));
       }
-      return true;
+      return item.featureKey ? hasFeature(role, item.featureKey) : true;
     });
-  }, [isSalesAccount]);
+  }, [role]);
 
   useEffect(() => {
-    console.log('🔍 Sidebar - isSalesAccount:', isSalesAccount, 'isLoading:', isLoading);
+    console.log('🔍 Sidebar - role:', role);
     console.log('📋 Sidebar filtered items:', filteredSidebarItems.map(item => item.title));
-  }, [isSalesAccount, filteredSidebarItems, isLoading]);
+  }, [role, filteredSidebarItems]);
 
   const toggleExpanded = (title: string) => {
-    setExpandedItems(prev => 
-      prev.includes(title) 
+    setExpandedItems(prev =>
+      prev.includes(title)
         ? prev.filter(item => item !== title)
         : [...prev, title]
     );
@@ -151,14 +171,19 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }:
     const isChildActive = isParentActive(item.children);
 
     if (hasChildren) {
+      const visibleChildren = item.children!.filter(
+        child => hasFeature(role, (child as any).featureKey)
+      );
+      if (visibleChildren.length === 0) return null;
+
       return (
         <div key={item.title} className="space-y-1">
           <button
             onClick={() => toggleExpanded(item.title)}
             className={cn(
               "w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-smooth hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              (isChildActive || isExpanded) 
-                ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+              (isChildActive || isExpanded)
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground"
             )}
           >
@@ -172,10 +197,10 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }:
               <ChevronRight className="h-4 w-4" />
             )}
           </button>
-          
+
           {isExpanded && (
             <div className="pl-4 space-y-1">
-              {item.children?.map(child => (
+              {visibleChildren.map(child => (
                 <Link
                   key={child.title}
                   to={child.href!}
@@ -213,6 +238,30 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }:
     );
   };
 
+  const sidebarContent = (
+    <nav className="flex-1 space-y-2 p-4 custom-scrollbar overflow-y-auto">
+      {filteredSidebarItems.map(item => {
+        const rendered = renderSidebarItem(item);
+        if (!rendered) return null;
+        return <div key={item.title}>{rendered}</div>;
+      })}
+    </nav>
+  );
+
+  const companyFooter = (
+    <div className="border-t border-sidebar-border p-4">
+      <div className="space-y-2">
+        <div className="flex items-center space-x-3 px-3 py-2 text-sm text-sidebar-foreground">
+          <Building2 className="h-4 w-4 text-sidebar-primary" />
+          <div className="min-w-0">
+            <div className="font-medium truncate">{currentCompany?.name || 'Company'}</div>
+            <div className="text-xs text-sidebar-foreground/60 truncate">{currentCompany?.city || currentCompany?.country || 'Management'}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   if (isMobile) {
     return (
       <div
@@ -221,68 +270,25 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }:
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        {/* Company Logo/Header */}
         <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-6">
           <BiolegendLogo size="lg" showText={true} className="text-sidebar-foreground" />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="md:hidden"
-          >
+          <Button variant="ghost" size="icon" onClick={onClose} className="md:hidden">
             <X className="h-5 w-5" />
           </Button>
         </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 space-y-2 p-4 custom-scrollbar overflow-y-auto">
-          {filteredSidebarItems.map(item => (
-            <div key={item.title} onClick={onClose}>
-              {renderSidebarItem(item)}
-            </div>
-          ))}
-        </nav>
-
-        {/* Company Info */}
-        <div className="border-t border-sidebar-border p-4">
-          <div className="space-y-2">
-            <div className="flex items-center space-x-3 px-3 py-2 text-sm text-sidebar-foreground">
-              <Building2 className="h-4 w-4 text-sidebar-primary" />
-              <div className="min-w-0">
-                <div className="font-medium truncate">{currentCompany?.name || 'Company'}</div>
-                <div className="text-xs text-sidebar-foreground/60 truncate">{currentCompany?.city || currentCompany?.country || 'Management'}</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        {sidebarContent}
+        {companyFooter}
       </div>
     );
   }
 
   return (
     <div className="flex h-full w-64 flex-col bg-sidebar border-r border-sidebar-border">
-      {/* Company Logo/Header */}
       <div className="flex h-16 items-center border-b border-sidebar-border px-6">
         <BiolegendLogo size="lg" showText={true} className="text-sidebar-foreground" />
       </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 space-y-2 p-4 custom-scrollbar overflow-y-auto">
-        {filteredSidebarItems.map(renderSidebarItem)}
-      </nav>
-
-      {/* Company Info */}
-      <div className="border-t border-sidebar-border p-4">
-        <div className="space-y-2">
-          <div className="flex items-center space-x-3 px-3 py-2 text-sm text-sidebar-foreground">
-            <Building2 className="h-4 w-4 text-sidebar-primary" />
-            <div className="min-w-0">
-              <div className="font-medium truncate">{currentCompany?.name || 'Company'}</div>
-              <div className="text-xs text-sidebar-foreground/60 truncate">{currentCompany?.city || currentCompany?.country || 'Management'}</div>
-            </div>
-          </div>
-        </div>
-      </div>
+      {sidebarContent}
+      {companyFooter}
     </div>
   );
 }

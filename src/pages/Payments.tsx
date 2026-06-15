@@ -43,6 +43,8 @@ import {
 import { usePayments, useCompanies, useDeletePayment } from '@/hooks/useDatabase';
 import { useInvoicesFixed as useInvoices } from '@/hooks/useInvoicesFixed';
 import { useAuth } from '@/contexts/AuthContext';
+import { hasFeature } from '@/utils/rolePermissions';
+import type { UserRole } from '@/utils/rolePermissions';
 import { generatePaymentReceiptPDF } from '@/utils/pdfGenerator';
 import { formatCurrency as formatCurrencyUtil } from '@/utils/currencyFormatter';
 
@@ -103,9 +105,9 @@ export default function Payments() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<any>(null);
 
-  const isSalesAccount = profile?.email?.toLowerCase() === 'sales@layonsconstruction.com';
+  const role = (profile?.role || 'user') as UserRole;
 
-  if (isSalesAccount) {
+  if (!hasFeature(role, 'payments')) {
     return (
       <div className="space-y-6 p-6">
         <Alert className="border-red-200 bg-red-50">

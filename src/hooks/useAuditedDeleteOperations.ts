@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { performAuditedDelete, performAuditedDeleteMultiple, getClientIp, getUserAgent } from '@/utils/auditedDelete';
+import { performAuditedDelete, performAuditedDeleteMultiple } from '@/utils/auditedDelete';
 
 /**
  * Hook providing audited delete operations with automatic logging
@@ -28,9 +28,6 @@ export function useAuditedDeleteOperations() {
         throw new Error('User not authenticated');
       }
 
-      const ipAddress = await getClientIp();
-      const userAgent = getUserAgent();
-
       return performAuditedDelete(
         params.tableName,
         params.whereKey,
@@ -47,8 +44,6 @@ export function useAuditedDeleteOperations() {
           userId: profile.id,
           userFullName: profile.full_name,
           userEmail: profile.email,
-          ipAddress,
-          userAgent,
         }
       );
     },
@@ -531,9 +526,6 @@ export function useAuditedDeleteOperations() {
           throw new Error('User not authenticated');
         }
 
-        const ipAddress = await getClientIp();
-        const userAgent = getUserAgent();
-
         const result = await performAuditedDeleteMultiple(
           params.tableName,
           params.parentKey,
@@ -547,8 +539,6 @@ export function useAuditedDeleteOperations() {
             userId: profile.id,
             userFullName: profile.full_name,
             userEmail: profile.email,
-            ipAddress,
-            userAgent,
           }
         );
 
