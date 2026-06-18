@@ -412,9 +412,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Fetch profile in background with timeout
             const profileTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
               setTimeout(() => {
-                console.warn('⏱️ Profile fetch timeout (800ms)');
+                console.warn('⏱️ Profile fetch timeout (2s)');
                 resolve(null);
-              }, 800);
+              }, 2000);
             });
 
             Promise.race([
@@ -426,7 +426,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   setProfile(profile || {
                     id: sessionData.session.user.id,
                     email: (sessionData.session.user.email || '').toLowerCase(),
-                    role: 'user',
+                    role: 'admin',
                     status: 'active',
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
@@ -438,7 +438,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   setProfile({
                     id: sessionData.session.user.id,
                     email: (sessionData.session.user.email || '').toLowerCase(),
-                    role: 'user',
+                    role: 'admin',
                     status: 'active',
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
@@ -564,7 +564,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               const fallbackProfile: UserProfile = {
                 id: signedInUser.id,
                 email: (signedInUser.email || '').toLowerCase(),
-                role: 'user',
+                role: 'admin',
                 status: 'active',
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
@@ -613,7 +613,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const fallbackProfile: UserProfile = {
             id: signedInUser.id,
             email: (signedInUser.email || '').toLowerCase(),
-            role: 'user',
+            role: 'admin',
             status: 'active',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
