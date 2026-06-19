@@ -388,6 +388,7 @@ export default function BOQs() {
         header_image: currentCompany.header_image || undefined,
         stamp_image: currentCompany.stamp_image || undefined,
         company_services: currentCompany.company_services || undefined,
+        default_terms_and_conditions: currentCompany.default_terms_and_conditions || undefined,
       } : undefined, options);
       const suffix = options?.customTitle ? ` (${options.customTitle})` : '';
       toast.success(`BOQ ${boq.number} PDF downloaded${suffix}`);
