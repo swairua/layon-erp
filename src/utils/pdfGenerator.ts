@@ -1363,12 +1363,19 @@ export const generatePDF = async (data: DocumentData) => {
 
       <!-- Page 2: Terms and Conditions -->
       <div class="terms-page page">
-        <!-- Terms Section (only shown if terms are provided) -->
+        <!-- Terms Section (shown if provided or use company default) -->
         ${(data.terms_and_conditions && data.terms_and_conditions.trim()) ? `
         <div style="margin-bottom: 8px;">
           <h3 style="font-size: 13px; font-weight: bold; margin-bottom: 4px; margin-top: 0; text-transform: uppercase;">Terms;</h3>
           <div style="font-size: 11px; line-height: 1.4; margin: 0; padding: 0; color: #000;">
             ${parseAndRenderTerms(data.terms_and_conditions, grandTotalForBOQ, data.showCalculatedValuesInTerms !== false, formatCurrency)}
+          </div>
+        </div>
+        ` : (company && company.default_terms_and_conditions && company.default_terms_and_conditions.trim()) ? `
+        <div style="margin-bottom: 8px;">
+          <h3 style="font-size: 13px; font-weight: bold; margin-bottom: 4px; margin-top: 0; text-transform: uppercase;">Terms;</h3>
+          <div style="font-size: 11px; line-height: 1.4; margin: 0; padding: 0; color: #000;">
+            ${parseAndRenderTerms(company.default_terms_and_conditions, grandTotalForBOQ, data.showCalculatedValuesInTerms !== false, formatCurrency)}
           </div>
         </div>
         ` : ''}
