@@ -330,7 +330,7 @@ export function EditBOQModal({ open, onOpenChange, boq, onSuccess, company }: Ed
           setContractor(dataToUse.contractor || boqData.contractor || '');
           setNotes(boqData.notes || '');
 
-          const termsToUse = dataToUse.termsAndConditions || '';
+          const termsToUse = (dataToUse.terms_and_conditions || dataToUse.termsAndConditions) || currentCompany?.default_terms_and_conditions || '';
           setTermsAndConditions(termsToUse);
           const showCalcValues = dataToUse.showCalculatedValuesInTerms || false;
           setShowCalculatedValuesInTerms(showCalcValues);
