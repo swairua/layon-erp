@@ -473,6 +473,12 @@ export interface DocumentData {
   total_amount: number;
   paid_amount?: number;
   balance_due?: number;
+  payment_transactions?: Array<{
+    payment_number: string;
+    payment_date: string;
+    payment_method: string;
+    amount: number;
+  }>;
   notes?: string;
   terms_and_conditions?: string;
   showCalculatedValuesInTerms?: boolean; // Whether to show calculated values (e.g., "50% (KES 50,000)") in terms
@@ -3588,6 +3594,32 @@ export const generatePDF = async (data: DocumentData) => {
         </div>
         ` : ''}
 
+        ${(data.type === 'invoice' || data.type === 'proforma') && data.payment_transactions && data.payment_transactions.length > 0 ? `
+        <div class="payment-section" style="margin-top: 18px; border-top: 1px solid #d1d5db; padding-top: 12px;">
+          <h3 style="margin: 0 0 8px; font-size: 14px;">Payment Transaction History</h3>
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th style="width: 24%;">Date</th>
+                <th style="width: 26%;">Payment Number</th>
+                <th style="width: 25%;">Method</th>
+                <th style="width: 25%;">Amount Applied</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.payment_transactions.map(transaction => `
+                <tr>
+                  <td>${formatDate(transaction.payment_date)}</td>
+                  <td>${transaction.payment_number}</td>
+                  <td>${transaction.payment_method.replace(/_/g, ' ')}</td>
+                  <td class="amount-cell">${formatCurrency(transaction.amount)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        ` : ''}
+
         <!-- Payment Details Section (for receipts) -->
         ${data.type === 'receipt' ? `
         <div class="payment-section" style="margin-top: 8px; border-top: 2px solid #000; padding-top: 8px;">
@@ -4178,9 +4210,40 @@ export const generateCustomerStatementPDF = async (customer: any, invoices: any[
     return daysOverdue > 90 && (inv.total_amount - (inv.paid_amount || 0)) > 0;
   }).reduce((sum, inv) => sum + (inv.total_amount - (inv.paid_amount || 0)), 0);
 
-  // Create all transactions (invoices and payments) with running balance
+  const invoiceNumbers = new Map(invoices.map(invoice => [invoice.id, invoice.invoice_number]));
+  const paymentTransactions = payments.flatMap(payment => {
+    const allocations = payment.payment_allocations || [];
+    const allocatedAmount = allocations.reduce((total: number, allocation: any) => total + Number(allocation.allocated_amount || allocation.amount_allocated || 0), 0);
+    const allocatedTransactions = allocations
+      .filter((allocation: any) => allocation.invoice_id && invoiceNumbers.has(allocation.invoice_id))
+      .map((allocation: any) => {
+        const invoiceNumber = invoiceNumbers.get(allocation.invoice_id);
+        return {
+          date: payment.payment_date,
+          type: 'payment',
+          reference: `${payment.payment_number || payment.id || 'PMT'} · ${invoiceNumber}`,
+          description: `Payment applied to invoice ${invoiceNumber}`,
+          debit: 0,
+          credit: Number(allocation.allocated_amount || allocation.amount_allocated || 0),
+          due_date: null
+        };
+      });
+    const unallocatedAmount = Math.max(0, Number(payment.amount || 0) - allocatedAmount);
+
+    return unallocatedAmount > 0
+      ? [...allocatedTransactions, {
+          date: payment.payment_date,
+          type: 'payment',
+          reference: payment.payment_number || payment.id || 'PMT',
+          description: 'Unallocated payment',
+          debit: 0,
+          credit: unallocatedAmount,
+          due_date: null
+        }]
+      : allocatedTransactions;
+  });
+
   const allTransactions = [
-    // Add all invoices as debits
     ...invoices.map(inv => ({
       date: inv.invoice_date,
       type: 'invoice',
@@ -4190,16 +4253,7 @@ export const generateCustomerStatementPDF = async (customer: any, invoices: any[
       credit: 0,
       due_date: inv.due_date
     })),
-    // Add all payments as credits
-    ...payments.map(pay => ({
-      date: pay.payment_date,
-      type: 'payment',
-      reference: pay.payment_number || pay.id || 'PMT',
-      description: `Payment - ${pay.method || 'Cash'}`,
-      debit: 0,
-      credit: pay.amount || 0,
-      due_date: null
-    }))
+    ...paymentTransactions
   ];
 
   // Sort by date
