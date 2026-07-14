@@ -2128,16 +2128,14 @@ export const useDashboardStats = (companyId?: string, month?: number, year?: num
   return useQuery({
     queryKey: ['dashboard_stats', companyId, month, year],
     queryFn: async () => {
-      // Get counts and totals
       const [
         { data: invoices },
         { data: customers },
-        { data: products },
-        { data: cashReceipts }
+        { data: products }
       ] = await Promise.all([
         supabase
           .from('invoices')
-          .select('total_amount, status, invoice_date')
+          .select('total_amount, paid_amount, balance_due, status, invoice_date')
           .eq('company_id', companyId || '550e8400-e29b-41d4-a716-446655440000'),
         supabase
           .from('customers')
@@ -2146,14 +2144,9 @@ export const useDashboardStats = (companyId?: string, month?: number, year?: num
         supabase
           .from('products')
           .select('stock_quantity, minimum_stock_level')
-          .eq('company_id', companyId || '550e8400-e29b-41d4-a716-446655440000'),
-        supabase
-          .from('cash_receipts')
-          .select('total_amount, payment_date')
           .eq('company_id', companyId || '550e8400-e29b-41d4-a716-446655440000')
       ]);
 
-      // Filter by month/year if provided
       const filterByMonth = (item: any, dateField: string) => {
         if (!month || !year) return true;
         const date = new Date(item[dateField]);
@@ -2161,16 +2154,22 @@ export const useDashboardStats = (companyId?: string, month?: number, year?: num
       };
 
       const filteredInvoices = invoices?.filter(inv => filterByMonth(inv, 'invoice_date')) || [];
-      const filteredReceipts = cashReceipts?.filter(receipt => filterByMonth(receipt, 'payment_date')) || [];
 
-      const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0);
-      const totalPayments = filteredReceipts.reduce((sum, receipt) => sum + Number(receipt.total_amount || 0), 0);
-      const lowStockProducts = products?.filter(p => p.stock_quantity <= p.minimum_stock_level).length || 0;
+      const totalRevenue = filteredInvoices
+        .filter(inv => inv.status !== 'draft')
+        .reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0);
+
+      const totalPayments = filteredInvoices.reduce((sum, inv) => sum + Number(inv.paid_amount || 0), 0);
+
+      const outstandingAmount = filteredInvoices.reduce((sum, inv) => sum + Number(inv.balance_due || 0), 0);
+
+      const lowStockProducts = products?.filter(p => Number(p.stock_quantity) <= Number(p.minimum_stock_level)).length || 0;
       const pendingInvoices = filteredInvoices.filter(inv => inv.status === 'sent').length;
 
       return {
         totalRevenue,
         totalPayments,
+        outstandingAmount,
         customerCount: customers?.length || 0,
         productCount: products?.length || 0,
         lowStockProducts,

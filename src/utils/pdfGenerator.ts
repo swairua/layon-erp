@@ -2190,8 +2190,46 @@ export const generatePDF = async (data: DocumentData) => {
               <td class="label" style="padding: 12px 15px; text-align: left; font-weight: bold; color: #000; font-size: 14px;">GRAND TOTAL:</td>
               <td class="amount" style="padding: 12px 15px; text-align: right; font-weight: bold; color: #000; font-size: 14px;">${formatCurrency(grandTotal)}</td>
             </tr>
+            ${(data.type === 'invoice' || data.type === 'proforma') && data.paid_amount !== undefined ? `
+            <tr class="payment-info" style="border-top: 1px solid #d1d5db;">
+              <td class="label" style="padding: 8px 15px; text-align: left;">Paid Amount:</td>
+              <td class="amount" style="padding: 8px 15px; text-align: right; color: hsl(var(--primary));">${formatCurrency(data.paid_amount || 0)}</td>
+            </tr>
+            <tr class="balance-info">
+              <td class="label" style="padding: 8px 15px; text-align: left; font-weight: bold;">Balance Due:</td>
+              <td class="amount" style="padding: 8px 15px; text-align: right; font-weight: bold; color: ${(data.balance_due || 0) > 0 ? '#DC2626' : 'hsl(var(--primary))'};">${formatCurrency(data.balance_due || 0)}</td>
+            </tr>
+            ` : ''}
           </table>
         </div>
+
+        ${(data.type === 'invoice' || data.type === 'proforma') && data.payment_transactions && data.payment_transactions.length > 0 ? `
+        <div class="payment-section" style="margin-top: 18px; border-top: 1px solid #d1d5db; padding-top: 12px;">
+          <h3 style="margin: 0 0 8px; font-size: 13px; font-weight: bold;">Payment Transaction History</h3>
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th style="width: 20%;">Date</th>
+                <th style="width: 22%;">Payment Number</th>
+                <th style="width: 18%;">Method</th>
+                <th style="width: 20%;">Reference</th>
+                <th style="width: 20%;">Amount Applied</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.payment_transactions.map(transaction => `
+                <tr>
+                  <td>${formatDate(transaction.payment_date)}</td>
+                  <td>${transaction.payment_number}</td>
+                  <td>${transaction.payment_method.replace(/_/g, ' ')}</td>
+                  <td>${transaction.reference_number || '-'}</td>
+                  <td class="amount-cell">${formatCurrency(transaction.amount)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        ` : ''}
       </div>
     `;
 

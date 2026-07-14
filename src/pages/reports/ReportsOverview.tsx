@@ -105,7 +105,7 @@ export default function ReportsOverview() {
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
 
-  const outstanding = (stats?.totalRevenue || 0) - (stats?.totalPayments || 0);
+  const outstanding = stats?.outstandingAmount || 0;
 
   return (
     <div className="space-y-8">
@@ -118,8 +118,6 @@ export default function ReportsOverview() {
         <StatCard
           title="Total Revenue"
           value={formatCurrency(stats?.totalRevenue || 0)}
-          change="+12.3%"
-          changeType="increase"
           icon={DollarSign}
           loading={isLoading}
         />

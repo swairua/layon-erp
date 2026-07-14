@@ -100,14 +100,12 @@ export function DashboardStats({ month, year }: DashboardStatsProps = {}) {
     {
       title: 'Total Revenue',
       value: formatCurrency(stats?.totalRevenue || 0),
-      change: '+12.3%',
-      changeType: 'increase' as const,
       icon: DollarSign
     },
     {
       title: 'Outstanding Amount',
-      value: formatCurrency((stats?.totalRevenue || 0) - (stats?.totalPayments || 0)),
-      alert: ((stats?.totalRevenue || 0) - (stats?.totalPayments || 0)) > 0,
+      value: formatCurrency(stats?.outstandingAmount || 0),
+      alert: (stats?.outstandingAmount || 0) > 0,
       icon: AlertTriangle
     },
     {
