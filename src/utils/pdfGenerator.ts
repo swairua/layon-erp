@@ -477,6 +477,7 @@ export interface DocumentData {
     payment_number: string;
     payment_date: string;
     payment_method: string;
+    reference_number?: string;
     amount: number;
   }>;
   notes?: string;
@@ -3600,10 +3601,11 @@ export const generatePDF = async (data: DocumentData) => {
           <table class="items-table">
             <thead>
               <tr>
-                <th style="width: 24%;">Date</th>
-                <th style="width: 26%;">Payment Number</th>
-                <th style="width: 25%;">Method</th>
-                <th style="width: 25%;">Amount Applied</th>
+                <th style="width: 20%;">Date</th>
+                <th style="width: 22%;">Payment Number</th>
+                <th style="width: 18%;">Method</th>
+                <th style="width: 20%;">Reference</th>
+                <th style="width: 20%;">Amount Applied</th>
               </tr>
             </thead>
             <tbody>
@@ -3612,6 +3614,7 @@ export const generatePDF = async (data: DocumentData) => {
                   <td>${formatDate(transaction.payment_date)}</td>
                   <td>${transaction.payment_number}</td>
                   <td>${transaction.payment_method.replace(/_/g, ' ')}</td>
+                  <td>${transaction.reference_number || '-'}</td>
                   <td class="amount-cell">${formatCurrency(transaction.amount)}</td>
                 </tr>
               `).join('')}
@@ -3904,7 +3907,8 @@ export const downloadInvoicePDF = async (invoice: any, documentType: 'INVOICE' |
           payments(
             payment_number,
             payment_date,
-            payment_method
+            payment_method,
+            reference_number
           )
         `)
         .eq('invoice_id', invoice.id)
@@ -3917,6 +3921,7 @@ export const downloadInvoicePDF = async (invoice: any, documentType: 'INVOICE' |
           payment_number: alloc.payments?.payment_number || 'N/A',
           payment_date: alloc.payments?.payment_date || '',
           payment_method: alloc.payments?.payment_method || '',
+          reference_number: alloc.payments?.reference_number || '',
           amount: alloc.amount_allocated || 0
         }));
         console.log('✅ Payment allocations fetched:', paymentTransactions.length);

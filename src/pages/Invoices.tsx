@@ -984,6 +984,7 @@ Website:`;
                                   <TableHead className="text-xs">Payment Number</TableHead>
                                   <TableHead className="text-xs">Payment Date</TableHead>
                                   <TableHead className="text-xs">Payment Method</TableHead>
+                                  <TableHead className="text-xs">Reference Number</TableHead>
                                   <TableHead className="text-xs">Amount Allocated</TableHead>
                                 </TableRow>
                               </TableHeader>
@@ -993,6 +994,7 @@ Website:`;
                                     <TableCell>{alloc.payments?.payment_number || 'N/A'}</TableCell>
                                     <TableCell>{alloc.payments?.payment_date ? new Date(alloc.payments.payment_date).toLocaleDateString() : 'N/A'}</TableCell>
                                     <TableCell className="capitalize">{(alloc.payments?.payment_method || 'N/A').replace('_', ' ')}</TableCell>
+                                    <TableCell>{alloc.payments?.reference_number || 'N/A'}</TableCell>
                                     <TableCell className="text-success font-medium">{formatCurrency(alloc.amount_allocated || 0, invoice.currency || 'KES')}</TableCell>
                                   </TableRow>
                                 ))}
