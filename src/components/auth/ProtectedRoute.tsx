@@ -22,7 +22,7 @@ export function ProtectedRoute({
   allowedRoles,
   requiredFeature,
 }: ProtectedRouteProps) {
-  const { isAuthenticated, loading, profile, permissions } = useAuth();
+  const { isAuthenticated, loading, profile, permissions, profileReady } = useAuth();
   const [sessionVerified, setSessionVerified] = useState(false);
   const [verifyingSession, setVerifyingSession] = useState(false);
 
@@ -50,7 +50,7 @@ export function ProtectedRoute({
     verifySuperbaseSession();
   }, [isAuthenticated, loading]);
 
-  if (loading || verifyingSession) {
+  if (loading || verifyingSession || (requiredFeature && isAuthenticated && !profileReady)) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
