@@ -44,7 +44,12 @@ const ROLE_PERMISSIONS: Record<UserRole, FeatureKey[]> = {
   ],
 };
 
-export function hasFeature(role: UserRole | null | undefined, feature: FeatureKey): boolean {
+export function hasFeature(
+  role: UserRole | null | undefined,
+  feature: FeatureKey,
+  overrides?: Record<string, boolean | null>
+): boolean {
+  if (overrides && feature in overrides) return overrides[feature] === true;
   if (!role) return false;
   const features = ROLE_PERMISSIONS[role];
   return features ? features.includes(feature) : false;

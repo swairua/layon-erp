@@ -115,7 +115,7 @@ export async function verifyManualSetup() {
     const { data: profiles, error } = await supabase
       .from('profiles')
       .select('id, email, role')
-      .eq('role', 'super_admin')
+      .eq('role', 'admin')
       .limit(1);
 
     if (!error && profiles && profiles.length > 0) {

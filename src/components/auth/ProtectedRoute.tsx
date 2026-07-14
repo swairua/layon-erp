@@ -22,7 +22,7 @@ export function ProtectedRoute({
   allowedRoles,
   requiredFeature,
 }: ProtectedRouteProps) {
-  const { isAuthenticated, loading, profile } = useAuth();
+  const { isAuthenticated, loading, profile, permissions } = useAuth();
   const [sessionVerified, setSessionVerified] = useState(false);
   const [verifyingSession, setVerifyingSession] = useState(false);
 
@@ -98,7 +98,7 @@ export function ProtectedRoute({
     );
   }
 
-  if (requiredFeature && role && !hasFeature(role, requiredFeature)) {
+  if (requiredFeature && !hasFeature(role, requiredFeature, permissions)) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Card className="w-full max-w-md text-center">

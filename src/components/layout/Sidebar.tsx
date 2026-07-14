@@ -127,7 +127,7 @@ interface SidebarProps {
 export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }: SidebarProps) {
   const location = useLocation();
   const { currentCompany } = useCurrentCompany();
-  const { profile } = useAuth();
+  const { profile, permissions } = useAuth();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
   const role = (profile?.role || 'user') as UserRole;
@@ -135,11 +135,11 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }:
   const filteredSidebarItems = useMemo(() => {
     return sidebarItems.filter(item => {
       if (item.children) {
-        return item.children.some(child => hasFeature(role, child.featureKey));
+        return item.children.some(child => hasFeature(role, child.featureKey, permissions));
       }
-      return item.featureKey ? hasFeature(role, item.featureKey) : true;
+      return item.featureKey ? hasFeature(role, item.featureKey, permissions) : true;
     });
-  }, [role]);
+  }, [role, permissions]);
 
   useEffect(() => {
     console.log('🔍 Sidebar - role:', role);
@@ -172,7 +172,7 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose = () => {} }:
 
     if (hasChildren) {
       const visibleChildren = item.children!.filter(
-        child => hasFeature(role, (child as any).featureKey)
+        child => hasFeature(role, (child as any).featureKey, permissions)
       );
       if (visibleChildren.length === 0) return null;
 
