@@ -3510,8 +3510,8 @@ export const generatePDF = async (data: DocumentData) => {
         </div>
         ` : ''}
 
-        <!-- Items Section -->
-        ${data.items && data.items.length > 0 ? `
+        <!-- Items Section (hidden for receipts) -->
+        ${data.type !== 'receipt' && data.items && data.items.length > 0 ? `
         <div class="items-section">
           <table class="items-table">
             <thead>
