@@ -60,7 +60,39 @@ const computeCustomerStatements = (customers: any[], invoices: any[], payments: 
 
     const overdueAmount = days30 + days60 + days90;
 
-    // Build transactions array
+    const invoiceNumbers = new Map(customerInvoices.map(invoice => [invoice.id, invoice.invoice_number]));
+    const paymentTransactions = customerPayments.flatMap(payment => {
+      const allocations = payment.payment_allocations || [];
+      const allocatedAmount = allocations.reduce((total: number, allocation: any) => total + Number(allocation.allocated_amount || allocation.amount_allocated || 0), 0);
+      const allocatedTransactions = allocations
+        .filter((allocation: any) => allocation.invoice_id && invoiceNumbers.has(allocation.invoice_id))
+        .map((allocation: any) => {
+          const invoiceNumber = invoiceNumbers.get(allocation.invoice_id);
+          return {
+            date: payment.payment_date,
+            type: 'Payment',
+            reference: `${payment.payment_number} · ${invoiceNumber}`,
+            description: `Payment applied to invoice ${invoiceNumber}`,
+            debit: 0,
+            credit: Number(allocation.allocated_amount || allocation.amount_allocated || 0),
+            balance: 0
+          };
+        });
+      const unallocatedAmount = Math.max(0, Number(payment.amount || 0) - allocatedAmount);
+
+      return unallocatedAmount > 0
+        ? [...allocatedTransactions, {
+            date: payment.payment_date,
+            type: 'Payment',
+            reference: payment.payment_number,
+            description: 'Unallocated payment',
+            debit: 0,
+            credit: unallocatedAmount,
+            balance: 0
+          }]
+        : allocatedTransactions;
+    });
+
     const allTransactions = [
       ...customerInvoices.map(inv => ({
         date: inv.invoice_date,
@@ -69,17 +101,9 @@ const computeCustomerStatements = (customers: any[], invoices: any[], payments: 
         description: `Invoice - ${inv.invoice_number}`,
         debit: Number(inv.total_amount) || 0,
         credit: 0,
-        balance: 0 // Will be calculated
+        balance: 0
       })),
-      ...customerPayments.map(pay => ({
-        date: pay.payment_date,
-        type: 'Payment',
-        reference: pay.payment_number,
-        description: `Payment - ${pay.payment_method || 'Cash'}`,
-        debit: 0,
-        credit: Number(pay.amount) || 0,
-        balance: 0 // Will be calculated
-      }))
+      ...paymentTransactions
     ];
 
     // Sort by date and calculate running balance
