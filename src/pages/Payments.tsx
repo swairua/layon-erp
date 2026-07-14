@@ -46,6 +46,7 @@ import { usePayments, useCompanies, useDeletePayment } from '@/hooks/useDatabase
 import { useInvoicesFixed as useInvoices } from '@/hooks/useInvoicesFixed';
 import { generatePaymentReceiptPDF } from '@/utils/pdfGenerator';
 import { formatCurrency as formatCurrencyUtil } from '@/utils/currencyFormatter';
+import { getReceiptBalances } from '@/utils/paymentReceiptBalances';
 
 interface Payment {
   id: string;
@@ -56,6 +57,7 @@ interface Payment {
   payment_method: 'cash' | 'mpesa' | 'mobile_money' | 'bank_transfer' | 'cheque';
   reference_number?: string;
   notes?: string;
+  created_at?: string | null;
   customers?: {
     name: string;
     email?: string;
@@ -225,30 +227,24 @@ export default function Payments() {
         toast.warning('No invoices associated with this payment. Receipt will be generated without invoice particulars.');
       }
 
-      // Enrich payment data with invoice balance information
+      const invoiceTotals = new Map(
+        invoices.map(invoice => [invoice.id, Number(invoice.total_amount || 0)]),
+      );
+      const receiptBalances = getReceiptBalances(payments, invoiceTotals);
+
       const enrichedPayment = {
         ...payment,
         payment_allocations: payment.payment_allocations?.map(alloc => {
-          // Find the corresponding invoice to get balance information
           const invoice = invoices.find(inv => inv.invoice_number === alloc.invoice_number);
+          const balance = receiptBalances.get(`${payment.id}:${alloc.id}`);
 
-          // Calculate previous balance (balance before this payment)
-          const currentBalanceDue = invoice?.balance_due || 0;
-          const previousBalance = currentBalanceDue + alloc.allocated_amount;
-
-          // Calculate due amount after this payment
-          const dueAmount = Math.max(0, previousBalance - alloc.allocated_amount);
-
-          const enrichedAlloc = {
+          return {
             ...alloc,
             paid_amount: invoice?.paid_amount || 0,
             balance_due: invoice?.balance_due || 0,
-            previous_balance: previousBalance,
-            due_amount: dueAmount
+            previous_balance: balance?.previous_balance ?? Number(alloc.invoice_total || 0),
+            due_amount: balance?.current_balance ?? Math.max(0, Number(alloc.invoice_total || 0) - Number(alloc.allocated_amount || 0))
           };
-
-          console.log('Enriched allocation:', enrichedAlloc);
-          return enrichedAlloc;
         }) || []
       };
 
