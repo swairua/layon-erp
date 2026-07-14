@@ -70,6 +70,7 @@ export interface AuthContextType {
   isAdmin: boolean;
   refreshProfile: () => Promise<void>;
   clearTokens: () => void;
+  permissions: Record<string, boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -95,6 +96,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
@@ -167,6 +169,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (profileData.email) {
           profileData.email = profileData.email.toLowerCase();
         }
+
+        const { data: permissionData, error: permissionError } = await supabase
+          .from('user_permissions')
+          .select('permission_name, granted')
+          .eq('user_id', userId);
+
+        if (permissionError) throw permissionError;
+
+        setPermissions(Object.fromEntries(
+          (permissionData || []).map(permission => [permission.permission_name, permission.granted === true])
+        ));
         return profileData;
       } catch (fetchError) {
         lastError = fetchError;
@@ -309,12 +322,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setSession(null);
           setUser(null);
           setProfile(null);
+          setPermissions({});
         }
       } else {
         if (mountedRef.current) {
           setSession(null);
           setUser(null);
           setProfile(null);
+          setPermissions({});
         }
       }
     } catch (error) {
@@ -426,7 +441,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   setProfile(profile || {
                     id: sessionData.session.user.id,
                     email: (sessionData.session.user.email || '').toLowerCase(),
-                    role: 'admin',
+                    role: 'user',
                     status: 'active',
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
@@ -438,7 +453,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   setProfile({
                     id: sessionData.session.user.id,
                     email: (sessionData.session.user.email || '').toLowerCase(),
-                    role: 'admin',
+                    role: 'user',
                     status: 'active',
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
@@ -564,7 +579,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               const fallbackProfile: UserProfile = {
                 id: signedInUser.id,
                 email: (signedInUser.email || '').toLowerCase(),
-                role: 'admin',
+                role: 'user',
                 status: 'active',
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
@@ -613,7 +628,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const fallbackProfile: UserProfile = {
             id: signedInUser.id,
             email: (signedInUser.email || '').toLowerCase(),
-            role: 'admin',
+            role: 'user',
             status: 'active',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -726,6 +741,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Still clear local state on error - user may have network issues
         setUser(null);
         setProfile(null);
+        setPermissions({});
         setSession(null);
         clearAuthTokens();
 
@@ -737,6 +753,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Clear state immediately
         setUser(null);
         setProfile(null);
+        setPermissions({});
         setSession(null);
 
         // Clear local storage
@@ -955,6 +972,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     clearAuthTokens();
     setUser(null);
     setProfile(null);
+    setPermissions({});
     setSession(null);
     toast.info('Authentication tokens cleared. Please sign in again.');
   }, []);
@@ -979,6 +997,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAdmin,
     refreshProfile,
     clearTokens,
+    permissions,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

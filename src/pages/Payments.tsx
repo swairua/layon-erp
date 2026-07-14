@@ -11,8 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { PaginationControls } from '@/components/pagination/PaginationControls';
 import { usePagination } from '@/hooks/usePagination';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -46,9 +44,6 @@ import {
 } from 'lucide-react';
 import { usePayments, useCompanies, useDeletePayment } from '@/hooks/useDatabase';
 import { useInvoicesFixed as useInvoices } from '@/hooks/useInvoicesFixed';
-import { useAuth } from '@/contexts/AuthContext';
-import { hasFeature } from '@/utils/rolePermissions';
-import type { UserRole } from '@/utils/rolePermissions';
 import { generatePaymentReceiptPDF } from '@/utils/pdfGenerator';
 import { formatCurrency as formatCurrencyUtil } from '@/utils/currencyFormatter';
 
@@ -127,7 +122,6 @@ function formatCurrency(amount: number, currency: string = 'KES') {
 }
 
 export default function Payments() {
-  const { profile } = useAuth();
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState<string>('all');
@@ -139,32 +133,6 @@ export default function Payments() {
   const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
-
-  const role = (profile?.role || 'user') as UserRole;
-
-  if (!hasFeature(role, 'payments')) {
-    return (
-      <div className="space-y-6 p-6">
-        <Alert className="border-red-200 bg-red-50">
-          <AlertCircle className="h-4 w-4 text-red-600" />
-          <AlertDescription className="text-red-900">
-            You don't have permission to access Payments.
-          </AlertDescription>
-        </Alert>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Access Denied</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-slate-600">
-              You don't have permission to view or manage payments. Please contact your administrator if you believe this is an error.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   // Set method filter from URL params
   useEffect(() => {
