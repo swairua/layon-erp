@@ -6,6 +6,7 @@ import { formatCurrency as formatCurrencyUtil } from './currencyFormatter';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { getProjectTitleFromInvoice } from './boqInvoiceLinkage';
+import { supabase } from '@/integrations/supabase/client';
 
 // Helper function to render HTML content to canvas
 const renderHTMLToCanvas = async (htmlContent: string, pageSelector: string) => {
@@ -3859,6 +3860,40 @@ export const downloadInvoicePDF = async (invoice: any, documentType: 'INVOICE' |
     }
   }
 
+  // Fetch payment allocations for this invoice to include in PDF
+  let paymentTransactions: any[] = [];
+  if (invoice.id) {
+    try {
+      const { data: allocations, error } = await supabase
+        .from('payment_allocations')
+        .select(`
+          id,
+          amount_allocated,
+          payments(
+            payment_number,
+            payment_date,
+            payment_method
+          )
+        `)
+        .eq('invoice_id', invoice.id)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.warn('⚠️ Failed to fetch payment allocations (non-fatal):', error);
+      } else if (allocations && allocations.length > 0) {
+        paymentTransactions = allocations.map(alloc => ({
+          payment_number: alloc.payments?.payment_number || 'N/A',
+          payment_date: alloc.payments?.payment_date || '',
+          payment_method: alloc.payments?.payment_method || '',
+          amount: alloc.amount_allocated || 0
+        }));
+        console.log('✅ Payment allocations fetched:', paymentTransactions.length);
+      }
+    } catch (err) {
+      console.warn('⚠️ Unexpected error fetching payment allocations (non-fatal):', err);
+    }
+  }
+
   const items = invoice.invoice_items?.map((item: any) => {
     const quantity = Number(item.quantity || 0);
     const unitPrice = Number(item.unit_price || 0);
@@ -3951,6 +3986,7 @@ export const downloadInvoicePDF = async (invoice: any, documentType: 'INVOICE' |
       customTitle: 'INVOICE',
       project_title: projectTitle || undefined,
       display_as_percentage: invoice.display_as_percentage || false,
+      payment_transactions: paymentTransactions,
     };
   } else {
     documentData = {
@@ -3981,6 +4017,7 @@ export const downloadInvoicePDF = async (invoice: any, documentType: 'INVOICE' |
       customTitle: 'INVOICE',
       project_title: projectTitle || undefined,
       display_as_percentage: invoice.display_as_percentage || false,
+      payment_transactions: paymentTransactions,
     };
   }
 

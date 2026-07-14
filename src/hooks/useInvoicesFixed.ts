@@ -189,6 +189,48 @@ export const useInvoicesFixed = (companyId?: string) => {
           itemsMap.get(item.invoice_id).push(item);
         });
 
+        // Step 6a: Fetch payment allocations for each invoice
+        let paymentAllocations = [] as any[];
+        try {
+          if (invoiceIds.length > 0) {
+            const { data, error } = await supabase
+              .from('payment_allocations')
+              .select(`
+                id,
+                invoice_id,
+                payment_id,
+                amount_allocated,
+                payments(
+                  id,
+                  payment_number,
+                  payment_date,
+                  amount,
+                  payment_method,
+                  reference_number
+                )
+              `)
+              .in('invoice_id', invoiceIds);
+
+            if (error) {
+              console.error('Error fetching payment allocations (non-fatal):', (error as any)?.message || error);
+            } else if (data) {
+              paymentAllocations = data;
+              console.log('✅ Payment allocations fetched:', paymentAllocations.length);
+            }
+          }
+        } catch (err) {
+          console.error('Unexpected error fetching payment allocations (non-fatal):', err);
+        }
+
+        // Group payment allocations by invoice_id
+        const allocationsMap = new Map();
+        (paymentAllocations || []).forEach(alloc => {
+          if (!allocationsMap.has(alloc.invoice_id)) {
+            allocationsMap.set(alloc.invoice_id, []);
+          }
+          allocationsMap.get(alloc.invoice_id).push(alloc);
+        });
+
         // Step 7: Combine data with enriched information
         const enrichedInvoices = invoices.map(invoice => ({
           ...invoice,
@@ -198,7 +240,8 @@ export const useInvoicesFixed = (companyId?: string) => {
             phone: null
           },
           company: company || null,
-          invoice_items: itemsMap.get(invoice.id) || []
+          invoice_items: itemsMap.get(invoice.id) || [],
+          payment_allocations: allocationsMap.get(invoice.id) || []
         }));
 
         console.log('✅ Invoices enriched successfully:', enrichedInvoices.length);
@@ -367,6 +410,47 @@ export const useCustomerInvoicesFixed = (customerId?: string, companyId?: string
           itemsMap.get(item.invoice_id).push(item);
         });
 
+        // Fetch payment allocations for each invoice
+        let paymentAllocations = [] as any[];
+        try {
+          if (invoiceIds.length > 0) {
+            const { data, error } = await supabase
+              .from('payment_allocations')
+              .select(`
+                id,
+                invoice_id,
+                payment_id,
+                amount_allocated,
+                payments(
+                  id,
+                  payment_number,
+                  payment_date,
+                  amount,
+                  payment_method,
+                  reference_number
+                )
+              `)
+              .in('invoice_id', invoiceIds);
+
+            if (error) {
+              console.error('Error fetching payment allocations (non-fatal):', (error as any)?.message || error);
+            } else if (data) {
+              paymentAllocations = data;
+            }
+          }
+        } catch (err) {
+          console.error('Unexpected error fetching payment allocations (non-fatal):', err);
+        }
+
+        // Group payment allocations by invoice_id
+        const allocationsMap = new Map();
+        (paymentAllocations || []).forEach(alloc => {
+          if (!allocationsMap.has(alloc.invoice_id)) {
+            allocationsMap.set(alloc.invoice_id, []);
+          }
+          allocationsMap.get(alloc.invoice_id).push(alloc);
+        });
+
         // Combine data with enriched information
         const enrichedInvoices = invoices.map(invoice => ({
           ...invoice,
@@ -376,7 +460,8 @@ export const useCustomerInvoicesFixed = (customerId?: string, companyId?: string
             phone: null
           },
           company: company || null,
-          invoice_items: itemsMap.get(invoice.id) || []
+          invoice_items: itemsMap.get(invoice.id) || [],
+          payment_allocations: allocationsMap.get(invoice.id) || []
         }));
 
         return enrichedInvoices;

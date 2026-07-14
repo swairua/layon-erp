@@ -44,7 +44,8 @@ import {
   Trash2,
   AlertCircle,
   Clock,
-  CheckCircle
+  CheckCircle,
+  ChevronDown
 } from 'lucide-react';
 import { useCompanies, useDeleteInvoice } from '@/hooks/useDatabase';
 import { useInvoicesFixed as useInvoices } from '@/hooks/useInvoicesFixed';
@@ -83,6 +84,7 @@ interface Invoice {
   notes?: string;
   subtotal?: number;
   tax_amount?: number;
+  payment_allocations?: any[];
 }
 
 function getStatusColor(status: string) {
@@ -114,6 +116,7 @@ export default function Invoices() {
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; invoice?: Invoice }>({ open: false });
   const [isFixingData, setIsFixingData] = useState(false);
   const [showRLSErrorDialog, setShowRLSErrorDialog] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   // Filter states
   const [statusFilter, setStatusFilter] = useState('all');
@@ -282,6 +285,18 @@ export default function Invoices() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(amount);
+  };
+
+  const toggleExpandedRow = (invoiceId: string) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(invoiceId)) {
+        newSet.delete(invoiceId);
+      } else {
+        newSet.add(invoiceId);
+      }
+      return newSet;
+    });
   };
 
 
@@ -820,20 +835,32 @@ Website:`;
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10"></TableHead>
                     <TableHead>Invoice Number</TableHead>
                     <TableHead>Customer</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Due Date</TableHead>
                     <TableHead>Amount</TableHead>
-                    <TableHead>Paid</TableHead>
-                    <TableHead>Balance</TableHead>
+                    <TableHead>Paid Amount</TableHead>
+                    <TableHead>Balance Due</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedInvoices.map((invoice: Invoice) => (
+                    <>
                     <TableRow key={invoice.id} className="hover:bg-muted/50 transition-smooth">
+                      <TableCell className="w-10">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => toggleExpandedRow(invoice.id)}
+                        >
+                          <ChevronDown className={`h-4 w-4 transition-transform ${expandedRows.has(invoice.id) ? 'rotate-180' : ''}`} />
+                        </Button>
+                      </TableCell>
                       <TableCell className="font-medium">
                         <div className="flex items-center space-x-2">
                           <Receipt className="h-4 w-4 text-primary" />
@@ -946,6 +973,36 @@ Website:`;
                         </div>
                       </TableCell>
                     </TableRow>
+                    {expandedRows.has(invoice.id) && invoice.payment_allocations && invoice.payment_allocations.length > 0 && (
+                      <TableRow className="bg-muted/30">
+                        <TableCell colSpan={10} className="p-4">
+                          <div className="space-y-3">
+                            <h4 className="font-semibold text-sm">Payment Details</h4>
+                            <Table className="text-sm">
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="text-xs">Payment Number</TableHead>
+                                  <TableHead className="text-xs">Payment Date</TableHead>
+                                  <TableHead className="text-xs">Payment Method</TableHead>
+                                  <TableHead className="text-xs">Amount Allocated</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {invoice.payment_allocations.map((alloc: any) => (
+                                  <TableRow key={alloc.id} className="text-xs">
+                                    <TableCell>{alloc.payments?.payment_number || 'N/A'}</TableCell>
+                                    <TableCell>{alloc.payments?.payment_date ? new Date(alloc.payments.payment_date).toLocaleDateString() : 'N/A'}</TableCell>
+                                    <TableCell className="capitalize">{(alloc.payments?.payment_method || 'N/A').replace('_', ' ')}</TableCell>
+                                    <TableCell className="text-success font-medium">{formatCurrency(alloc.amount_allocated || 0, invoice.currency || 'KES')}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    </>
                   ))}
                 </TableBody>
               </Table>
