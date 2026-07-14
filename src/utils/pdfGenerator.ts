@@ -3675,19 +3675,17 @@ export const generatePDF = async (data: DocumentData) => {
             <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd;">
               <thead>
                 <tr style="background-color: #f5f5f5;">
-                  <th style="padding: 8px; text-align: left; border: 1px solid #ddd; font-weight: bold; font-size: 10px;">Invoice No</th>
-                  <th style="padding: 8px; text-align: right; border: 1px solid #ddd; font-weight: bold; font-size: 10px;">Previous Balance</th>
-                  <th style="padding: 8px; text-align: right; border: 1px solid #ddd; font-weight: bold; font-size: 10px;">Amount Paid</th>
-                  <th style="padding: 8px; text-align: right; border: 1px solid #ddd; font-weight: bold; font-size: 10px;">Current Balance</th>
+                  <th style="padding: 8px; text-align: left; border: 1px solid #ddd; font-weight: bold; font-size: 10px; width: 10%;">Item</th>
+                  <th style="padding: 8px; text-align: left; border: 1px solid #ddd; font-weight: bold; font-size: 10px; width: 60%;">Description</th>
+                  <th style="padding: 8px; text-align: right; border: 1px solid #ddd; font-weight: bold; font-size: 10px; width: 30%;">Amount</th>
                 </tr>
               </thead>
               <tbody>
-                ${(data.items as any[]).map((item: any) => item.invoice_number ? `
+                ${(data.items as any[]).map((item: any, index: number) => item.invoice_number ? `
                 <tr style="border: 1px solid #ddd;">
-                  <td style="padding: 8px; text-align: left; border: 1px solid #ddd; font-size: 10px;">${item.invoice_number || ''}</td>
-                  <td style="padding: 8px; text-align: right; border: 1px solid #ddd; font-size: 10px;">${formatCurrency((item as any).previous_balance || 0)}</td>
+                  <td style="padding: 8px; text-align: left; border: 1px solid #ddd; font-size: 10px;">${index + 1}</td>
+                  <td style="padding: 8px; text-align: left; border: 1px solid #ddd; font-size: 10px;">Invoice ${item.invoice_number || ''}</td>
                   <td style="padding: 8px; text-align: right; border: 1px solid #ddd; font-size: 10px; font-weight: 600;">${formatCurrency((item as any).allocated_amount || 0)}</td>
-                  <td style="padding: 8px; text-align: right; border: 1px solid #ddd; font-size: 10px;">${formatCurrency((item as any).current_balance || 0)}</td>
                 </tr>
                 ` : '').join('')}
               </tbody>
