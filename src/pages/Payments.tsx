@@ -83,6 +83,23 @@ function getStatusColor(status: 'Fully allocated' | 'Partially allocated' | 'Una
   return 'bg-muted text-muted-foreground border-muted-foreground/20';
 }
 
+function getInvoiceStatusColor(status: string) {
+  switch (status) {
+    case 'draft':
+      return 'bg-muted text-muted-foreground border-muted-foreground/20';
+    case 'sent':
+      return 'bg-warning-light text-warning border-warning/20';
+    case 'paid':
+      return 'bg-success-light text-success border-success/20';
+    case 'partial':
+      return 'bg-primary-light text-primary border-primary/20';
+    case 'overdue':
+      return 'bg-destructive-light text-destructive border-destructive/20';
+    default:
+      return 'bg-muted text-muted-foreground border-muted-foreground/20';
+  }
+}
+
 function getMethodColor(method: string) {
   switch (method) {
     case 'cash':
@@ -626,7 +643,7 @@ export default function Payments() {
                           </TableCell>
                           <TableCell>
                             {firstInvoice ? (
-                              <Badge variant="outline" className={getStatusColor(firstInvoice.status)}>
+                              <Badge variant="outline" className={getInvoiceStatusColor(firstInvoice.status)}>
                                 {firstInvoice.status}
                               </Badge>
                             ) : '—'}
