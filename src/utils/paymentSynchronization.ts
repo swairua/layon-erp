@@ -213,16 +213,23 @@ export async function synchronizePayments(
 
         result.allocationsCreated++;
         
-        // Update invoice balance
-        const newPaidAmount = (invoice.paid_amount || 0) + payment.amount;
-        const newBalanceDue = invoice.total_amount - newPaidAmount;
-        let newStatus = invoice.status;
-        
-        if (newBalanceDue <= 0) {
-          newStatus = 'paid';
-        } else if (newPaidAmount > 0) {
-          newStatus = 'partial';
+        // Update invoice balance from every allocation, not the cached invoice total.
+        const { data: allocations, error: allocationsError } = await supabase
+          .from('payment_allocations')
+          .select('amount_allocated')
+          .eq('invoice_id', invoice.id);
+
+        if (allocationsError) {
+          result.errors.push(`Failed to read allocations for invoice ${invoice.invoice_number}: ${allocationsError.message}`);
+          continue;
         }
+
+        const newPaidAmount = (allocations || []).reduce(
+          (sum, allocation) => sum + Number(allocation.amount_allocated || 0),
+          0
+        );
+        const newBalanceDue = invoice.total_amount - newPaidAmount;
+        const newStatus = newBalanceDue <= 0 ? 'paid' : newPaidAmount > 0 ? 'partial' : 'draft';
 
         const { error: invoiceError } = await supabase
           .from('invoices')

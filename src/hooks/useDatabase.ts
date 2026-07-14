@@ -1231,54 +1231,57 @@ export const useCreatePayment = () => {
           allocationError = err;
         }
 
-        if (allocationError) {
-          console.error('❌ Failed to create allocation:', allocationError);
-          console.error('Allocation error details:', JSON.stringify(allocationError, null, 2));
-          console.error('Payment was recorded successfully, but allocation failed');
-          console.error('Payment ID:', paymentResult.id);
-          console.error('Invoice ID:', invoice_id);
-
-          // If it's an RLS error, provide specific guidance
-          if (allocationError?.message?.includes('row-level security') || allocationError?.message?.includes('permission denied')) {
-            console.error('⚠️ RLS Error: User profile may not be linked to a company or RLS policies are blocking the insert');
-          }
-        } else if (allocationCreated) {
-          console.log('✅ Allocation created and linked successfully');
+        if (allocationError || !allocationCreated) {
+          await supabase.from('payments').delete().eq('id', paymentResult.id);
+          throw new Error(`Payment was not recorded because invoice allocation failed: ${allocationError?.message || 'allocation returned no row'}`);
         }
 
-        // 3. Get current invoice data and update balances
-        // Note: Use paid_amount and balance_due per database schema
+        // Derive the invoice balance from its current allocation total so repeated
+        // payments cannot overwrite each other with stale invoice fields.
+        const { data: allocations, error: allocationsError } = await supabase
+          .from('payment_allocations')
+          .select('amount_allocated')
+          .eq('invoice_id', invoice_id);
+
+        if (allocationsError) {
+          await supabase.from('payment_allocations').delete().eq('payment_id', paymentResult.id);
+          await supabase.from('payments').delete().eq('id', paymentResult.id);
+          throw allocationsError;
+        }
+
         const { data: invoice, error: fetchError } = await supabase
           .from('invoices')
-          .select('id, total_amount, paid_amount, balance_due, status')
+          .select('id, total_amount')
           .eq('id', invoice_id)
           .single();
 
-        if (!fetchError && invoice) {
-          const newPaidAmount = (invoice.paid_amount || 0) + paymentData.amount;
-          const newBalanceDue = Math.max(0, invoice.total_amount - newPaidAmount);
-          let newStatus = invoice.status;
+        if (fetchError || !invoice) {
+          await supabase.from('payment_allocations').delete().eq('payment_id', paymentResult.id);
+          await supabase.from('payments').delete().eq('id', paymentResult.id);
+          throw fetchError || new Error('Invoice not found');
+        }
 
-          if (newBalanceDue <= 0) {
-            newStatus = 'paid';
-          } else if (newPaidAmount > 0) {
-            newStatus = 'partial';
-          }
+        const paidAmount = (allocations || []).reduce(
+          (sum, allocation) => sum + Number(allocation.amount_allocated || 0),
+          0
+        );
+        const balanceDue = invoice.total_amount - paidAmount;
+        const status = balanceDue <= 0 ? 'paid' : paidAmount > 0 ? 'partial' : 'draft';
 
-          const { error: invoiceError } = await supabase
-            .from('invoices')
-            .update({
-              paid_amount: newPaidAmount,
-              balance_due: newBalanceDue,
-              status: newStatus,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', invoice_id);
+        const { error: invoiceError } = await supabase
+          .from('invoices')
+          .update({
+            paid_amount: paidAmount,
+            balance_due: balanceDue,
+            status,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', invoice_id);
 
-          if (invoiceError) {
-            console.error('Failed to update invoice balance:', invoiceError);
-            // Continue anyway - payment and allocation were recorded
-          }
+        if (invoiceError) {
+          await supabase.from('payment_allocations').delete().eq('payment_id', paymentResult.id);
+          await supabase.from('payments').delete().eq('id', paymentResult.id);
+          throw invoiceError;
         }
 
         const result = {
@@ -1286,14 +1289,10 @@ export const useCreatePayment = () => {
           payment_id: paymentResult.id,
           invoice_id: invoice_id,
           amount_allocated: paymentData.amount,
-          allocation_created: allocationCreated,
+          allocation_created: true,
           fallback_used: true,
-          allocation_failed: !allocationCreated,
-          allocation_error: allocationError ? {
-            message: allocationError?.message || String(allocationError),
-            code: (allocationError as any)?.code,
-            details: (allocationError as any)?.details
-          } : null
+          allocation_failed: false,
+          allocation_error: null
         };
 
         console.log('Payment creation result:', {

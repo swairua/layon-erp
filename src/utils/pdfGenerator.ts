@@ -3940,11 +3940,11 @@ export const downloadInvoicePDF = async (invoice: any, documentType: 'INVOICE' |
       console.log('💳 Payment allocations query result:', { allocations, error });
 
       if (error) {
-        console.warn('⚠️ Failed to fetch payment allocations; using invoice data when available:', error);
-      } else {
-        paymentTransactions = mapPaymentTransactions(allocations || []);
-        console.log('✅ Payment transactions mapped from query:', paymentTransactions);
+        throw new Error(`Failed to fetch payment allocations for invoice PDF: ${error.message}`);
       }
+
+      paymentTransactions = mapPaymentTransactions(allocations || []);
+      console.log('✅ Payment transactions mapped from query:', paymentTransactions);
     } catch (err) {
       console.warn('⚠️ Unexpected error fetching payment allocations; using invoice data when available:', err);
     }
@@ -3953,6 +3953,9 @@ export const downloadInvoicePDF = async (invoice: any, documentType: 'INVOICE' |
   }
 
   console.log('💳 Final payment transactions for PDF:', paymentTransactions);
+
+  const paidAmount = paymentTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+  const balanceDue = Number(invoice.total_amount || 0) - paidAmount;
 
   const items = invoice.invoice_items?.map((item: any) => {
     const quantity = Number(item.quantity || 0);
@@ -4038,8 +4041,8 @@ export const downloadInvoicePDF = async (invoice: any, documentType: 'INVOICE' |
       subtotal: invoice.subtotal,
       tax_amount: invoice.tax_amount,
       total_amount: invoice.total_amount,
-      paid_amount: invoice.paid_amount || 0,
-      balance_due: invoice.balance_due || (invoice.total_amount - (invoice.paid_amount || 0)),
+      paid_amount: paidAmount,
+      balance_due: balanceDue,
       notes: invoice.notes,
       terms_and_conditions: invoice.terms_and_conditions,
       showCalculatedValuesInTerms: false, // Never show calculated values in invoice terms
@@ -4069,8 +4072,8 @@ export const downloadInvoicePDF = async (invoice: any, documentType: 'INVOICE' |
       subtotal: invoice.subtotal,
       tax_amount: invoice.tax_amount,
       total_amount: invoice.total_amount,
-      paid_amount: invoice.paid_amount || 0,
-      balance_due: invoice.balance_due || (invoice.total_amount - (invoice.paid_amount || 0)),
+      paid_amount: paidAmount,
+      balance_due: balanceDue,
       notes: invoice.notes,
       terms_and_conditions: invoice.terms_and_conditions,
       showCalculatedValuesInTerms: false, // Never show calculated values in invoice terms
