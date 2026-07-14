@@ -71,6 +71,7 @@ export interface AuthContextType {
   refreshProfile: () => Promise<void>;
   clearTokens: () => void;
   permissions: Record<string, boolean>;
+  profileReady: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -97,6 +98,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+  const [profileReady, setProfileReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
@@ -296,7 +298,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setSession(newSession);
           setUser(newSession.user);
           setProfile(userProfile);
-          
+          setProfileReady(true);
+
           // Update last login for sign-in events, but don't await to prevent blocking
           if (event === 'SIGNED_IN' && userProfile) {
             updateLastLogin(newSession.user.id).catch(err =>
@@ -323,6 +326,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(null);
           setProfile(null);
           setPermissions({});
+          setProfileReady(true);
         }
       } else {
         if (mountedRef.current) {
@@ -330,6 +334,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(null);
           setProfile(null);
           setPermissions({});
+          setProfileReady(true);
         }
       }
     } catch (error) {
@@ -423,6 +428,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             setSession(sessionData.session);
             setUser(sessionData.session.user);
+            setProfileReady(false);
 
             // Fetch profile in background with timeout
             const profileTimeoutPromise = new Promise<UserProfile | null>((resolve) => {
@@ -446,6 +452,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                   } as UserProfile);
+                  setProfileReady(true);
                 }
               })
               .catch(() => {
@@ -458,6 +465,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                   } as UserProfile);
+                  setProfileReady(true);
                 }
               });
           }
@@ -550,6 +558,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('📝 [AuthContext] Setting session and user state after sign in');
         setSession(session);
         setUser(signedInUser);
+        setProfileReady(false);
 
         try {
           // Fetch profile with timeout before clearing loading state
@@ -573,6 +582,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 userProfile.email = userProfile.email.toLowerCase();
               }
               setProfile(userProfile);
+              setProfileReady(true);
               console.log('✅ Profile loaded successfully during sign in');
             } else {
               // Create minimal profile as fallback to allow app to function
@@ -585,6 +595,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 updated_at: new Date().toISOString()
               };
               setProfile(fallbackProfile);
+              setProfileReady(true);
               console.warn('⚠️ Profile fetch returned null, using fallback profile');
             }
 
@@ -634,6 +645,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             updated_at: new Date().toISOString()
           };
           setProfile(fallbackProfile);
+          setProfileReady(true);
         }
         clearTimeout(hardTimeoutId);
         setTimeout(() => toast.success('Signed in successfully'), 0);
@@ -973,6 +985,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     setProfile(null);
     setPermissions({});
+    setProfileReady(true);
     setSession(null);
     toast.info('Authentication tokens cleared. Please sign in again.');
   }, []);
@@ -998,6 +1011,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     refreshProfile,
     clearTokens,
     permissions,
+    profileReady,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
