@@ -810,6 +810,10 @@ export const generatePDF = async (data: DocumentData) => {
   console.log('📋 Items count:', data.items?.length || 0);
   console.log('📑 Sections count:', data.sections?.length || 0);
   console.log('💰 Total amount:', data.total_amount);
+  console.log('💳 Payment transactions:', {
+    count: data.payment_transactions?.length || 0,
+    transactions: data.payment_transactions || []
+  });
   console.log('[generatePDF] ℹ️ Processing document with flags:', JSON.stringify({
     isLCLBOQ: data.isLCLBOQ,
     type: data.type,
@@ -3878,6 +3882,7 @@ export const generatePDF = async (data: DocumentData) => {
 // Specific function for invoice PDF generation
 export const downloadInvoicePDF = async (invoice: any, documentType: 'INVOICE' | 'PROFORMA' = 'INVOICE', company?: CompanyDetails, companyId?: string) => {
   console.log('🎯 downloadInvoicePDF called for:', invoice.invoice_number);
+  console.log('🆔 Invoice ID for payment allocations:', invoice.id);
   console.log('📊 Raw invoice_items count:', invoice.invoice_items?.length || 0);
   console.log('📊 Raw invoice_items:', invoice.invoice_items);
 
@@ -3896,9 +3901,27 @@ export const downloadInvoicePDF = async (invoice: any, documentType: 'INVOICE' |
   }
 
   // Fetch payment allocations for this invoice to include in PDF
-  let paymentTransactions: any[] = [];
+  const mapPaymentTransactions = (allocations: any[] = []) => allocations.map((allocation) => {
+    const payment = Array.isArray(allocation.payments) ? allocation.payments[0] : allocation.payments;
+
+    return {
+      payment_number: payment?.payment_number || 'N/A',
+      payment_date: payment?.payment_date || '',
+      payment_method: payment?.payment_method || 'N/A',
+      reference_number: payment?.reference_number || '',
+      amount: Number(allocation.amount_allocated || 0)
+    };
+  });
+
+  let paymentTransactions = mapPaymentTransactions(invoice.payment_allocations);
+  console.log('💳 Payment allocations supplied with invoice:', {
+    count: invoice.payment_allocations?.length || 0,
+    transactions: paymentTransactions
+  });
+
   if (invoice.id) {
     try {
+      console.log('🔎 Fetching payment allocations for invoice:', invoice.id);
       const { data: allocations, error } = await supabase
         .from('payment_allocations')
         .select(`
@@ -3914,22 +3937,22 @@ export const downloadInvoicePDF = async (invoice: any, documentType: 'INVOICE' |
         .eq('invoice_id', invoice.id)
         .order('created_at', { ascending: true });
 
+      console.log('💳 Payment allocations query result:', { allocations, error });
+
       if (error) {
-        console.warn('⚠️ Failed to fetch payment allocations (non-fatal):', error);
-      } else if (allocations && allocations.length > 0) {
-        paymentTransactions = allocations.map(alloc => ({
-          payment_number: alloc.payments?.payment_number || 'N/A',
-          payment_date: alloc.payments?.payment_date || '',
-          payment_method: alloc.payments?.payment_method || '',
-          reference_number: alloc.payments?.reference_number || '',
-          amount: alloc.amount_allocated || 0
-        }));
-        console.log('✅ Payment allocations fetched:', paymentTransactions.length);
+        console.warn('⚠️ Failed to fetch payment allocations; using invoice data when available:', error);
+      } else {
+        paymentTransactions = mapPaymentTransactions(allocations || []);
+        console.log('✅ Payment transactions mapped from query:', paymentTransactions);
       }
     } catch (err) {
-      console.warn('⚠️ Unexpected error fetching payment allocations (non-fatal):', err);
+      console.warn('⚠️ Unexpected error fetching payment allocations; using invoice data when available:', err);
     }
+  } else {
+    console.warn('⚠️ Invoice has no ID; using payment allocations supplied with the invoice.');
   }
+
+  console.log('💳 Final payment transactions for PDF:', paymentTransactions);
 
   const items = invoice.invoice_items?.map((item: any) => {
     const quantity = Number(item.quantity || 0);
@@ -4058,6 +4081,7 @@ export const downloadInvoicePDF = async (invoice: any, documentType: 'INVOICE' |
     };
   }
 
+  console.log('📄 Invoice PDF document data payment transactions:', documentData.payment_transactions);
   return generatePDF(documentData);
 };
 
