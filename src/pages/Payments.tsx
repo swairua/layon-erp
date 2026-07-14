@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { parseErrorMessage } from '@/utils/errorHelpers';
 import { RecordPaymentModal } from '@/components/payments/RecordPaymentModal';
 import { ViewPaymentModal } from '@/components/payments/ViewPaymentModal';
+import { ViewInvoiceModal } from '@/components/invoices/ViewInvoiceModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -119,6 +120,8 @@ export default function Payments() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<any>(null);
   const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
 
   const role = (profile?.role || 'user') as UserRole;
 
@@ -170,6 +173,14 @@ export default function Payments() {
     // Payment data is already in the correct format from the database
     setSelectedPayment(payment);
     setShowViewModal(true);
+  };
+
+  const handleViewInvoice = (invoiceId: string) => {
+    const invoice = invoices.find(inv => inv.id === invoiceId);
+    if (invoice) {
+      setSelectedInvoice(invoice);
+      setShowInvoiceModal(true);
+    }
   };
 
   const handleDeleteClick = (payment: Payment) => {
@@ -545,6 +556,10 @@ export default function Payments() {
                     <TableHead className="w-10" />
                     <TableHead>Payment Number</TableHead>
                     <TableHead>Customer</TableHead>
+                    <TableHead>Invoice Number</TableHead>
+                    <TableHead>Invoice Date</TableHead>
+                    <TableHead>Invoice Total</TableHead>
+                    <TableHead>Invoice Status</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Amount (KES)</TableHead>
                     <TableHead>Method</TableHead>
@@ -565,6 +580,9 @@ export default function Payments() {
                         ? 'Partially allocated'
                         : 'Fully allocated';
                     const isExpanded = expandedPayments.has(payment.id);
+                    const firstAllocation = allocations.length > 0 ? allocations[0] : null;
+                    const firstInvoice = firstAllocation ? invoices.find(inv => inv.invoice_number === firstAllocation.invoice_number) : null;
+
                     return (
                       <Fragment key={payment.id}>
                         <TableRow className="hover:bg-muted/50">
@@ -585,6 +603,34 @@ export default function Payments() {
                           </TableCell>
                           <TableCell className="font-medium">{payment.payment_number}</TableCell>
                           <TableCell>{payment.customers?.name || 'N/A'}</TableCell>
+                          <TableCell>
+                            {firstAllocation ? (
+                              <Button
+                                variant="link"
+                                className="p-0 h-auto font-medium text-primary hover:underline"
+                                onClick={() => firstInvoice && handleViewInvoice(firstInvoice.id)}
+                                disabled={!firstInvoice}
+                              >
+                                {firstAllocation.invoice_number}
+                              </Button>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                            {allocations.length > 1 && <div className="text-xs text-muted-foreground">+{allocations.length - 1} more</div>}
+                          </TableCell>
+                          <TableCell>
+                            {firstInvoice ? new Date(firstInvoice.invoice_date).toLocaleDateString() : '—'}
+                          </TableCell>
+                          <TableCell>
+                            {firstInvoice ? formatCurrency(firstInvoice.total_amount) : '—'}
+                          </TableCell>
+                          <TableCell>
+                            {firstInvoice ? (
+                              <Badge variant="outline" className={getStatusColor(firstInvoice.status)}>
+                                {firstInvoice.status}
+                              </Badge>
+                            ) : '—'}
+                          </TableCell>
                           <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
                           <TableCell className="font-semibold text-success">{formatCurrency(payment.amount)}</TableCell>
                           <TableCell>
@@ -615,7 +661,7 @@ export default function Payments() {
                         </TableRow>
                         {isExpanded && (
                           <TableRow className="bg-muted/20">
-                            <TableCell colSpan={10} className="p-4">
+                            <TableCell colSpan={14} className="p-4">
                               {allocations.length > 0 ? (
                                 <div className="rounded-md border">
                                   <div className="flex items-center gap-2 border-b bg-muted/30 px-4 py-3 text-sm font-medium"><FileText className="h-4 w-4" />Invoice applications</div>
@@ -679,6 +725,25 @@ export default function Payments() {
         onDownloadReceipt={handleDownloadReceipt}
         onSendReceipt={(payment) => toast.info(`Sending receipt for payment ${payment.payment_number}`)}
       />
+
+      {/* View Invoice Modal */}
+      {selectedInvoice && (
+        <ViewInvoiceModal
+          open={showInvoiceModal}
+          onOpenChange={setShowInvoiceModal}
+          invoice={selectedInvoice}
+          onEdit={() => {
+            setShowInvoiceModal(false);
+            toast.info(`Editing invoice ${selectedInvoice.invoice_number}`);
+          }}
+          onDownload={() => toast.info(`Downloading invoice ${selectedInvoice.invoice_number}`)}
+          onSend={() => toast.info(`Sending invoice ${selectedInvoice.invoice_number}`)}
+          onRecordPayment={() => {
+            setShowInvoiceModal(false);
+            toast.info(`Recording payment for invoice ${selectedInvoice.invoice_number}`);
+          }}
+        />
+      )}
 
       {/* Delete Payment Confirmation Dialog */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
