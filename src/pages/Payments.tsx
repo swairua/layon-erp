@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { parseErrorMessage } from '@/utils/errorHelpers';
@@ -38,7 +38,10 @@ import {
   DollarSign,
   Download,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  FileText
 } from 'lucide-react';
 import { usePayments, useCompanies, useDeletePayment } from '@/hooks/useDatabase';
 import { useInvoicesFixed as useInvoices } from '@/hooks/useInvoicesFixed';
@@ -54,7 +57,7 @@ interface Payment {
   customer_id: string;
   payment_date: string;
   amount: number;
-  payment_method: 'cash' | 'mpesa' | 'bank_transfer' | 'cheque';
+  payment_method: 'cash' | 'mpesa' | 'mobile_money' | 'bank_transfer' | 'cheque';
   reference_number?: string;
   notes?: string;
   customers?: {
@@ -68,11 +71,15 @@ interface Payment {
     invoice_total: number;
     paid_amount?: number;
     balance_due?: number;
+    allocation_created_at?: string | null;
+    invoice_id?: string | null;
   }[];
 }
 
-function getStatusColor() {
-  return 'bg-success-light text-success border-success/20'; // All payments are completed when recorded
+function getStatusColor(status: 'Fully allocated' | 'Partially allocated' | 'Unallocated') {
+  if (status === 'Fully allocated') return 'bg-success-light text-success border-success/20';
+  if (status === 'Partially allocated') return 'bg-warning-light text-warning border-warning/20';
+  return 'bg-muted text-muted-foreground border-muted-foreground/20';
 }
 
 function getMethodColor(method: string) {
@@ -80,6 +87,7 @@ function getMethodColor(method: string) {
     case 'cash':
       return 'bg-success-light text-success border-success/20';
     case 'mpesa':
+    case 'mobile_money':
       return 'bg-primary-light text-primary border-primary/20';
     case 'bank_transfer':
       return 'bg-primary-light text-primary border-primary/20';
@@ -88,6 +96,12 @@ function getMethodColor(method: string) {
     default:
       return 'bg-muted text-muted-foreground border-muted-foreground/20';
   }
+}
+
+function formatPaymentMethod(method: string) {
+  if (method === 'mpesa' || method === 'mobile_money') return 'M-Pesa';
+  if (method === 'bank_transfer') return 'Bank Transfer';
+  return method.charAt(0).toUpperCase() + method.slice(1);
 }
 
 function formatCurrency(amount: number, currency: string = 'KES') {
@@ -104,6 +118,7 @@ export default function Payments() {
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<any>(null);
+  const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
 
   const role = (profile?.role || 'user') as UserRole;
 
@@ -282,7 +297,9 @@ export default function Payments() {
       const now = new Date();
       matchesFilter = paymentDate.getMonth() === now.getMonth() && paymentDate.getFullYear() === now.getFullYear();
     } else {
-      matchesFilter = payment.payment_method === methodFilter;
+      matchesFilter = methodFilter === 'mpesa'
+        ? payment.payment_method === 'mpesa' || payment.payment_method === 'mobile_money'
+        : payment.payment_method === methodFilter;
     }
 
     return matchesSearch && matchesFilter;
@@ -448,7 +465,7 @@ export default function Payments() {
             count = payments.length;
             label = 'All Payments';
           } else if (method === 'mpesa') {
-            count = payments.filter(p => p.payment_method === 'mpesa').length;
+            count = payments.filter(p => p.payment_method === 'mpesa' || p.payment_method === 'mobile_money').length;
             label = 'M-Pesa';
           } else if (method === 'bank_transfer') {
             count = payments.filter(p => p.payment_method === 'bank_transfer').length;
@@ -525,68 +542,106 @@ export default function Payments() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10" />
                     <TableHead>Payment Number</TableHead>
                     <TableHead>Customer</TableHead>
-                    <TableHead>Invoice</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Amount (KES)</TableHead>
                     <TableHead>Method</TableHead>
+                    <TableHead>Reference / Notes</TableHead>
+                    <TableHead>Allocation</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedPayments.map((payment) => (
-                    <TableRow key={payment.id} className="hover:bg-muted/50">
-                      <TableCell className="font-medium">{payment.payment_number}</TableCell>
-                      <TableCell>{payment.customers?.name || 'N/A'}</TableCell>
-                      <TableCell className="font-medium text-primary">
-                        {payment.payment_allocations?.[0]?.invoice_number || 'N/A'}
-                      </TableCell>
-                      <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
-                      <TableCell className="font-semibold text-success">{formatCurrency(payment.amount)}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={getMethodColor(payment.payment_method)}>
-                          {payment.payment_method.replace('_', ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={getStatusColor()}>
-                          Completed
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end space-x-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleViewPayment(payment)}
-                            title="View payment details"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDownloadReceipt(payment)}
-                            title="Download receipt"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteClick(payment)}
-                            title="Delete payment"
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            disabled={deletePayment.isPending}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {paginatedPayments.map((payment) => {
+                    const allocations = payment.payment_allocations || [];
+                    const totalAllocated = allocations.reduce((sum, allocation) => sum + Number(allocation.allocated_amount || 0), 0);
+                    const unallocatedAmount = Math.max(0, payment.amount - totalAllocated);
+                    const status = totalAllocated <= 0
+                      ? 'Unallocated'
+                      : unallocatedAmount > 0.01
+                        ? 'Partially allocated'
+                        : 'Fully allocated';
+                    const isExpanded = expandedPayments.has(payment.id);
+                    return (
+                      <Fragment key={payment.id}>
+                        <TableRow className="hover:bg-muted/50">
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setExpandedPayments((current) => {
+                                const next = new Set(current);
+                                if (next.has(payment.id)) next.delete(payment.id); else next.add(payment.id);
+                                return next;
+                              })}
+                              aria-label={`${isExpanded ? 'Collapse' : 'Expand'} allocation details for ${payment.payment_number}`}
+                              title={`${isExpanded ? 'Hide' : 'Show'} invoice allocations`}
+                            >
+                              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </Button>
+                          </TableCell>
+                          <TableCell className="font-medium">{payment.payment_number}</TableCell>
+                          <TableCell>{payment.customers?.name || 'N/A'}</TableCell>
+                          <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
+                          <TableCell className="font-semibold text-success">{formatCurrency(payment.amount)}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={getMethodColor(payment.payment_method)}>
+                              {formatPaymentMethod(payment.payment_method)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="max-w-48">
+                            {payment.reference_number && <div className="truncate font-mono text-xs">{payment.reference_number}</div>}
+                            {payment.notes && <div className="truncate text-xs text-muted-foreground" title={payment.notes}>{payment.notes}</div>}
+                            {!payment.reference_number && !payment.notes && <span className="text-muted-foreground">—</span>}
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">{formatCurrency(totalAllocated)}</div>
+                            <div className="text-xs text-muted-foreground">{allocations.length} invoice{allocations.length === 1 ? '' : 's'}</div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={getStatusColor(status)}>{status}</Badge>
+                            {unallocatedAmount > 0.01 && <div className="mt-1 text-xs text-muted-foreground">{formatCurrency(unallocatedAmount)} open</div>}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end space-x-1">
+                              <Button variant="ghost" size="icon" onClick={() => handleViewPayment(payment)} title="View payment details"><Eye className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleDownloadReceipt(payment)} title="Download receipt"><Download className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(payment)} title="Delete payment" className="text-destructive hover:text-destructive hover:bg-destructive/10" disabled={deletePayment.isPending}><Trash2 className="h-4 w-4" /></Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && (
+                          <TableRow className="bg-muted/20">
+                            <TableCell colSpan={10} className="p-4">
+                              {allocations.length > 0 ? (
+                                <div className="rounded-md border">
+                                  <div className="flex items-center gap-2 border-b bg-muted/30 px-4 py-3 text-sm font-medium"><FileText className="h-4 w-4" />Invoice applications</div>
+                                  <Table>
+                                    <TableHeader><TableRow><TableHead>Invoice</TableHead><TableHead>Invoice total</TableHead><TableHead>Previously paid</TableHead><TableHead>This payment</TableHead><TableHead>Balance due</TableHead><TableHead>Applied at</TableHead></TableRow></TableHeader>
+                                    <TableBody>{allocations.map((allocation) => (
+                                      <TableRow key={allocation.id}>
+                                        <TableCell className="font-medium text-primary">{allocation.invoice_number}</TableCell>
+                                        <TableCell>{formatCurrency(allocation.invoice_total)}</TableCell>
+                                        <TableCell>{formatCurrency(Math.max(0, Number(allocation.paid_amount || 0) - Number(allocation.allocated_amount || 0)))}</TableCell>
+                                        <TableCell className="font-medium text-success">{formatCurrency(Number(allocation.allocated_amount || 0))}</TableCell>
+                                        <TableCell>{formatCurrency(allocation.balance_due ?? Math.max(0, allocation.invoice_total - Number(allocation.paid_amount || 0)))}</TableCell>
+                                        <TableCell>{allocation.allocation_created_at ? new Date(allocation.allocation_created_at).toLocaleString() : '—'}</TableCell>
+                                      </TableRow>
+                                    ))}</TableBody>
+                                  </Table>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground"><FileText className="h-4 w-4" />This payment has not been applied to an invoice.</div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </TableBody>
               </Table>
               <PaginationControls

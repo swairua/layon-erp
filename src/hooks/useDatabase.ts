@@ -963,7 +963,8 @@ export const usePayments = (companyId?: string) => {
               id,
               payment_id,
               invoice_id,
-              allocated_amount
+              amount_allocated,
+              created_at
             `)
             .in('payment_id', paymentIds);
 
@@ -996,7 +997,7 @@ export const usePayments = (companyId?: string) => {
               // Try to fetch invoices by their IDs
               let { data: invoiceData, error: invoiceError } = await supabase
                 .from('invoices')
-                .select('id, invoice_number, total_amount, company_id')
+                .select('id, invoice_number, total_amount, paid_amount, balance_due, company_id')
                 .in('id', validInvoiceIds);
 
               console.log('Invoice fetch result (specific IDs):', {
@@ -1019,7 +1020,7 @@ export const usePayments = (companyId?: string) => {
                 // Fallback: Fetch all invoices for the company
                 const { data: allInvoices, error: allInvoicesError } = await supabase
                   .from('invoices')
-                  .select('id, invoice_number, total_amount, company_id')
+                  .select('id, invoice_number, total_amount, paid_amount, balance_due, company_id')
                   .eq('company_id', companyId);
 
                 console.log('Fallback invoice fetch result (all for company):', {
@@ -1070,8 +1071,12 @@ export const usePayments = (companyId?: string) => {
           allocationsMap.get(allocation.payment_id).push({
             id: allocation.id,
             invoice_number: invoice?.invoice_number || 'N/A',
-            allocated_amount: allocation.allocated_amount,
-            invoice_total: invoice?.total_amount || 0
+            allocated_amount: Number(allocation.amount_allocated || 0),
+            invoice_total: Number(invoice?.total_amount || 0),
+            paid_amount: Number(invoice?.paid_amount || 0),
+            balance_due: Number(invoice?.balance_due || 0),
+            allocation_created_at: allocation.created_at || null,
+            invoice_id: allocation.invoice_id || null
           });
         });
 
